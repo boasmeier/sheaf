@@ -10,16 +10,21 @@ Item {
     readonly property alias document: document
     readonly property bool hasDocument: document.status === PdfDocument.Ready
     readonly property int pageCount: document.pageCount
-    readonly property int currentPage: view.currentPage
+    // Page at the centre of the viewport. PdfMultiPageView's own currentPage only updates when its scroll bar
+    // is used, not while scrolling with the wheel, so track the visible page ourselves.
+    property int currentPage: 0
     readonly property real zoom: view.renderScale
 
     readonly property real minZoom: 0.1
     readonly property real maxZoom: 10
     readonly property real zoomStep: 1.25
+    // Pixels scrolled per mouse wheel notch. Qt's default for flickables is far too small for page-sized content.
+    property real wheelScrollPixels: 180
 
     function goToPage(page) {
+        // Not view.goToPage(): it ignores requests for the page its navigator last saw, which can be stale.
         if (hasDocument)
-            view.goToPage(Math.max(0, Math.min(page, pageCount - 1)))
+            view.goToLocation(Math.max(0, Math.min(page, pageCount - 1)), Qt.point(-1, -1), 0)
     }
 
     function setZoom(value) {
@@ -49,6 +54,13 @@ Item {
         }
     }
 
+    Connections {
+        target: root.flickable()
+        function onContentYChanged() {
+            root.updateCurrentPage()
+        }
+    }
+
     PdfMultiPageView {
         id: view
         anchors.fill: parent
@@ -56,8 +68,36 @@ Item {
         visible: root.hasDocument
     }
 
-    // Ctrl+wheel zooms; plain wheel falls through to the view for scrolling. This item sits above the view
-    // because the view's flickable would otherwise consume every wheel event.
+    // The scrollable item inside PdfMultiPageView (a TableView), which the view does not expose.
+    function flickable() {
+        for (const child of view.children) {
+            if (child.contentY !== undefined)
+                return child
+        }
+        return null
+    }
+
+    function updateCurrentPage() {
+        const flick = flickable()
+        if (!flick || !hasDocument)
+            return
+        const row = flick.cellAtPos(view.width / 2, view.height / 2).y
+        if (row >= 0)
+            currentPage = row
+    }
+
+    function scrollBy(dy) {
+        const flick = flickable()
+        if (!flick)
+            return
+        const top = flick.originY
+        const bottom = Math.max(top, top + flick.contentHeight - flick.height)
+        flick.cancelFlick()
+        flick.contentY = Math.max(top, Math.min(bottom, flick.contentY + dy))
+    }
+
+    // Ctrl+wheel zooms and plain wheel scrolls. This item sits above the view because the view's flickable
+    // would otherwise consume every wheel event.
     Item {
         anchors.fill: parent
         z: 1
@@ -68,6 +108,14 @@ Item {
                     root.zoomIn()
                 else if (event.angleDelta.y < 0)
                     root.zoomOut()
+            }
+        }
+        WheelHandler {
+            acceptedModifiers: Qt.NoModifier
+            onWheel: event => {
+                // Touchpads report exact pixels; mouse wheels report 120 units per notch.
+                const dy = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y / 120 * root.wheelScrollPixels
+                root.scrollBy(-dy)
             }
         }
     }
