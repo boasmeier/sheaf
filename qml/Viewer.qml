@@ -113,8 +113,10 @@ Item {
         WheelHandler {
             acceptedModifiers: Qt.NoModifier
             onWheel: event => {
-                // Touchpads report exact pixels; mouse wheels report 120 units per notch.
-                const dy = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y / 120 * root.wheelScrollPixels
+                // Touchpads report exact pixels. Mice may report pixelDelta too (e.g. on Wayland), but it is
+                // tiny, so use the notch count from angleDelta (120 units per notch) for everything else.
+                const touchpad = event.device.type === PointerDevice.TouchPad && event.pixelDelta.y !== 0
+                const dy = touchpad ? event.pixelDelta.y : event.angleDelta.y / 120 * root.wheelScrollPixels
                 root.scrollBy(-dy)
             }
         }
