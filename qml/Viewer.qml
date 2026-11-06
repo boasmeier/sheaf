@@ -103,6 +103,7 @@ Item {
         z: 1
         WheelHandler {
             acceptedModifiers: Qt.ControlModifier
+            acceptedDevices: PointerDevice.AllDevices
             onWheel: event => {
                 if (event.angleDelta.y > 0)
                     root.zoomIn()
@@ -112,6 +113,7 @@ Item {
         }
         WheelHandler {
             acceptedModifiers: Qt.NoModifier
+            acceptedDevices: PointerDevice.AllDevices
             onWheel: event => {
                 // Touchpads report exact pixels. Mice may report pixelDelta too (e.g. on Wayland), but it is
                 // tiny, so use the notch count from angleDelta (120 units per notch) for everything else.
