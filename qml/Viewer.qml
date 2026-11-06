@@ -57,7 +57,7 @@ Item {
     Connections {
         target: root.flickable()
         function onContentYChanged() {
-            root.updateCurrentPage()
+            Qt.callLater(root.updateCurrentPage)
         }
     }
 
