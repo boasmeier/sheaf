@@ -1,16 +1,26 @@
 ---
 Language: Cpp
 BasedOnStyle: Google
-Standard: Cpp20
+Standard: c++20
 UseTab: Never
-SortIncludes: true
 IndentWidth: 2
 ColumnLimit: 120
-AllowShortFunctionsOnASingleLine: None
+AccessModifierOffset: -2
+DerivePointerAlignment: false
+PointerAlignment: Left
+AllowShortFunctionsOnASingleLine: InlineOnly
 AllowShortIfStatementsOnASingleLine: Never
+BreakBeforeBraces: Custom
 BraceWrapping:
   BeforeElse: true
   BeforeCatch: true
-
-BreakBeforeBraces: Custom
----
+SortIncludes: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^"'            # own headers
+    Priority: 1
+  - Regex: '^<Q'           # Qt headers
+    Priority: 2
+  - Regex: '^<'            # standard library and others
+    Priority: 3
+StatementAttributeLikeMacros: [Q_EMIT, emit]

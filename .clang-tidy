@@ -1,22 +1,42 @@
-{
-  "Checks": "*, -llvmlibc*, -fuchsia-default-arguments-*, -fuchsia-trailing-return, -fuchsia-overloaded-operator, -modernize-use-trailing-return-type, -llvm-header-guard, -altera*",
-  "HeaderFilterRegex": "modules\/.*(include|src).*",
-  "CheckOptions": [
-    {
-      "key": "readability-identifier-naming.MemberSuffix",
-      "value": "_"
-    },
-    {
-      "key": "readability-identifier-naming.VariableCase",
-      "value": "lower_case"
-    },
-    {
-      "key": "readability-identifier-naming.ParameterCase",
-      "value": "lower_case"
-    },
-    {
-      "key": "readability-identifier-naming.FunctionCase",
-      "value": "CamelCase"
-    }
-  ]
-}
+---
+Checks: >
+  bugprone-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -modernize-use-trailing-return-type,
+  -misc-non-private-member-variables-in-classes,
+  -misc-include-cleaner,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-owning-memory,
+  -readability-magic-numbers,
+  -readability-identifier-length,
+  -readability-convert-member-functions-to-static,
+  -portability-avoid-pragma-once,
+  -modernize-use-nodiscard,
+  -readability-function-cognitive-complexity,
+  -cppcoreguidelines-special-member-functions,
+  -cppcoreguidelines-pro-bounds-constant-array-index
+HeaderFilterRegex: '.*/sheaf/(src|tests)/.*'
+FormatStyle: file
+CheckOptions:
+  readability-identifier-naming.ClassCase: CamelCase
+  readability-identifier-naming.StructCase: CamelCase
+  readability-identifier-naming.NamespaceCase: lower_case
+  readability-identifier-naming.FunctionCase: CamelCase
+  readability-identifier-naming.VariableCase: lower_case
+  readability-identifier-naming.ParameterCase: lower_case
+  readability-identifier-naming.PrivateMemberCase: lower_case
+  readability-identifier-naming.PrivateMemberSuffix: _
+  readability-identifier-naming.GlobalConstantCase: CamelCase
+  readability-identifier-naming.GlobalConstantPrefix: k
+  readability-identifier-naming.ConstexprVariableCase: CamelCase
+  readability-identifier-naming.ConstexprVariablePrefix: k
+  readability-identifier-naming.EnumConstantCase: CamelCase
+  readability-identifier-naming.EnumConstantPrefix: k
