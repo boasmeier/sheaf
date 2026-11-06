@@ -1,0 +1,2 @@
+- Format code using clang-format.
+- Lint code using clang-tidy.
