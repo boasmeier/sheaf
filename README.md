@@ -1,11 +1,26 @@
 # Sheaf
 
-A minimal, fast PDF viewer for students: tabs in collapsible groups, remembered reading positions, a back/forward
-history for links, fast full-text search, and session restore. Built with C++20 and Qt 6 (Qt Quick, Qt PDF), for
-Linux first.
+**A minimal, fast PDF viewer for students.**
+Keep every course in its own tab group, pick up exactly where you left off, and never lose your place when following a link.
 
-Milestones M1 to M6 of [PLAN.md](PLAN.md) are implemented (viewer, tabs and position memory, link navigation,
-sidebar with groups, session restore, search).
+Supports tabs in collapsible groups, remembered reading positions, a back/forward history for links, fast full-text search, and session restore. Built with C++20 and Qt 6 (Qt Quick, Qt PDF), for Linux first.
+
+## Requirements
+
+Sheaf is developed and tested on Ubuntu (GNOME, Wayland) with Qt 6.10. Other systems and older Qt versions are
+untested (CMake asks for Qt 6.4 or newer). You need a C++20 compiler, CMake 3.21 or newer, Ninja, and Qt 6 with Quick,
+Qt PDF and the SQLite driver. On Ubuntu:
+
+```bash
+sudo apt install build-essential cmake ninja-build \
+  qt6-base-dev qt6-declarative-dev qt6-declarative-dev-tools qt6-pdf-dev libqt6sql6-sqlite \
+  qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-window qml6-module-qtquick-layouts \
+  qml6-module-qtquick-dialogs qml6-module-qtquick-pdf qml6-module-qtqml-workerscript
+```
+
+To work on the code you also want `clang-format` and `clang-tidy` (see `scripts/tidy.sh`).
+
+## Build and run
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
