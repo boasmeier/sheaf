@@ -32,6 +32,17 @@ group); drag tabs and groups to reorder them. With the sidebar focused: Up/Down 
 tab or fold a group, Left/Right fold and unfold, F2 renames, Delete closes a tab or deletes a group. Deleting a group
 closes its tabs (after asking); the position in each document is remembered.
 
+## Session
+
+The groups, tabs, their order and collapsed state, the active tab, the position in each document, and the window and
+sidebar size are saved as you work (a change is written within milliseconds) and again when you quit, whether by
+closing the window, Ctrl+Q, or being told to end by the system (SIGTERM at logout). The next start brings it all back;
+only the active document is loaded. The database is `~/.local/share/sheaf/sheaf/sheaf.db`.
+
+A tab whose file has gone is kept and shown greyed out (⚠) with a "File not found" page offering **Locate…** (the
+same file is relinked silently, a different one only after asking, and the remembered position follows) and **Remove
+tab**. Opening the moved file again relinks the lost tab by itself.
+
 ## Tests
 
 ```
@@ -42,8 +53,10 @@ ctest --test-dir build --output-on-failure
 - `tst_qml`: QML tests in `tests/qml/` against the real QML sources with generated fixture PDFs (headless, software
   rendering): viewer behaviour (`tst_viewer.qml`), position restore without wrong or half-rendered pages
   (`tst_restore.qml`), the real window with the real tab controller (`tst_tabswitch.qml`) and link navigation
-  with back/forward history (`tst_navigation.qml`), and the sidebar and group shortcuts (`tst_sidebar.qml`,
-  `tst_shortcuts.qml`).
+  with back/forward history (`tst_navigation.qml`), the sidebar and group shortcuts (`tst_sidebar.qml`,
+  `tst_shortcuts.qml`), and quitting and restarting with missing files and window state (`tst_session.qml`).
+- `tst_quit` starts the real application headless and ends it with SIGTERM, SIGINT and SIGHUP like a logout does, then
+  starts it again and checks the session.
 - `tst_realpdfs.qml` repeats the tab-switch scenario on your own PDFs and is skipped unless you name them:
 
   ```

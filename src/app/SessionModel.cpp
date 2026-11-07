@@ -40,7 +40,10 @@ QVariant SessionModel::data(const QModelIndex& index, int role) const {
       case TabCountRole:
         return static_cast<int>(group->tabs.size());
       case ActiveRole:
+      case MissingRole:
         return false;
+      case PathRole:
+        return QString();
       default:
         return {};
     }
@@ -63,6 +66,8 @@ QVariant SessionModel::data(const QModelIndex& index, int role) const {
       return tab->id == active_tab_id_;
     case PathRole:
       return tab->path;
+    case MissingRole:
+      return tab->missing;
     case CollapsedRole:
       return false;
     case TabCountRole:
@@ -73,8 +78,9 @@ QVariant SessionModel::data(const QModelIndex& index, int role) const {
 }
 
 QHash<int, QByteArray> SessionModel::roleNames() const {
-  return {{KindRole, "kind"},           {TitleRole, "title"},       {IdRole, "rowId"},      {GroupIdRole, "groupId"},
-          {CollapsedRole, "collapsed"}, {TabCountRole, "tabCount"}, {ActiveRole, "active"}, {PathRole, "path"}};
+  return {{KindRole, "kind"},       {TitleRole, "title"},         {IdRole, "rowId"},
+          {GroupIdRole, "groupId"}, {CollapsedRole, "collapsed"}, {TabCountRole, "tabCount"},
+          {ActiveRole, "active"},   {PathRole, "path"},           {MissingRole, "missing"}};
 }
 
 // --- Change reporting --------------------------------------------------------------------------------------------
@@ -230,6 +236,31 @@ bool SessionModel::RemoveTab(int tab_id) {
     if (active_tab_id_ == tab_id) {
       active_tab_id_ = -1;
     }
+    return true;
+  });
+}
+
+bool SessionModel::SetTabMissing(int tab_id, bool missing) {
+  return Mutate([&] {
+    Tab* tab = FindTab(tab_id);
+    if (tab == nullptr || tab->missing == missing) {
+      return false;
+    }
+    tab->missing = missing;
+    return true;
+  });
+}
+
+bool SessionModel::RelinkTab(int tab_id, const QString& path, const QString& file_key, const QString& title) {
+  return Mutate([&] {
+    Tab* tab = FindTab(tab_id);
+    if (tab == nullptr) {
+      return false;
+    }
+    tab->path = path;
+    tab->file_key = file_key;
+    tab->title = title;
+    tab->missing = false;
     return true;
   });
 }

@@ -2,6 +2,7 @@
 
 #include "app/SessionModel.h"
 #include "storage/PositionStore.h"
+#include "storage/SessionStore.h"
 
 #include <QList>
 #include <QObject>
@@ -23,6 +24,9 @@ class TabController : public QObject {
   Q_PROPERTY(int activeGroupId READ activeGroupId NOTIFY activeGroupChanged)
   Q_PROPERTY(QUrl activeUrl READ activeUrl NOTIFY activeTabChanged)
   Q_PROPERTY(QString activeTitle READ activeTitle NOTIFY activeTabChanged)
+  // The active tab's file is not where it was last time; the UI offers to locate it or remove the tab.
+  Q_PROPERTY(bool activeTabMissing READ activeTabMissing NOTIFY activeTabChanged)
+  Q_PROPERTY(QString activePath READ activePath NOTIFY activeTabChanged)
   Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY historyChanged)
   Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY historyChanged)
   // {valid, page, offsetY, zoom} stored for the active tab; valid is false for a document never seen before.
@@ -31,7 +35,12 @@ class TabController : public QObject {
 public:
   static constexpr int kDefaultSaveDelayMs = 500;
 
-  TabController(PositionStore& store, int save_delay_ms = kDefaultSaveDelayMs, QObject* parent = nullptr);
+  TabController(PositionStore& positions, SessionStore& session, int save_delay_ms = kDefaultSaveDelayMs,
+                QObject* parent = nullptr);
+
+  // Rebuilds the groups, tabs, collapsed state and active tab saved last time. Tabs whose file is gone are kept and
+  // marked missing; nothing is loaded except what the UI shows for the active tab. Call once, before opening files.
+  void Restore();
 
   SessionModel* model();
   const SessionModel* model() const;
@@ -39,11 +48,13 @@ public:
   int activeGroupId() const;
   QUrl activeUrl() const;
   QString activeTitle() const;
+  bool activeTabMissing() const;
+  QString activePath() const;
   QVariantMap activePosition() const;
   bool canGoBack() const;
   bool canGoForward() const;
 
-  // Writes any pending position immediately (tab switch, tab close, quit).
+  // Writes any pending position and unsaved session changes immediately (tab switch, tab close, quit).
   void Flush();
 
   // --- Tabs ---
@@ -61,6 +72,14 @@ public:
   Q_INVOKABLE void moveActiveTab(int delta);
   // Moves a tab to the end of a group (the menu alternative to dragging).
   Q_INVOKABLE void moveTabToGroup(int tab_id, int group_id);
+
+  // Points a tab whose file moved at the file the user picked. Returns 0 when relinked, 1 if the file cannot be read,
+  // 2 if it looks like a different file than before (not relinked unless `force`), 3 for an unknown tab.
+  Q_INVOKABLE int locate(int tab_id, const QUrl& url, bool force = false);
+
+  // --- Small persistent settings (window size and the like) ---
+  Q_INVOKABLE QVariant value(const QString& key, const QVariant& default_value = {}) const;
+  Q_INVOKABLE void setValue(const QString& key, const QVariant& value);
 
   // --- Groups ---
   // Creates a group (named "Group N" if `name` is empty), makes it the active group and returns its id.
@@ -99,15 +118,23 @@ private:
     Position position;
   };
 
-  // Makes `tab_id` the active tab, or none for -1, and loads its stored position.
-  void SetActive(int tab_id);
+  // Makes `tab_id` the active tab, or none for -1, and loads its stored position. `reveal` expands its group.
+  void SetActive(int tab_id, bool reveal = true);
+  // Tells the UI the active tab changed in a way it must reload (e.g. it was relinked).
+  void ReloadActive();
+  void QueueSessionSave();
+  void SaveSession();
   void SetActiveGroup(int group_id);
   // The tab to show after the tab at sidebar position `position` went away (-1 if no tabs are left).
   int NeighbourAfterRemoval(int position) const;
 
   SessionModel model_;
   PositionStore& store_;
+  SessionStore& session_;
   QTimer save_timer_;
+  QTimer session_timer_;
+  bool session_dirty_ = false;
+  bool restoring_ = false;
   int active_group_id_ = -1;
   QVariantMap active_position_;
   bool has_pending_ = false;

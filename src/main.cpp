@@ -1,6 +1,8 @@
 #include "app/TabController.h"
+#include "app/UnixSignals.h"
 #include "storage/Database.h"
 #include "storage/PositionStore.h"
+#include "storage/SessionStore.h"
 
 #include <QCommandLineParser>
 #include <QDir>
@@ -26,8 +28,12 @@ int main(int argc, char* argv[]) {
   parser.addPositionalArgument("files", "PDF files to open.", "[files...]");
   parser.process(app);
 
+  sheaf::InstallQuitSignalHandlers();
+
   sheaf::PositionStore positions(database);
-  sheaf::TabController tabs(positions);
+  sheaf::SessionStore session(database);
+  sheaf::TabController tabs(positions, session);
+  tabs.Restore();  // the groups and tabs of last time
   QObject::connect(&app, &QCoreApplication::aboutToQuit, &tabs, [&tabs] { tabs.Flush(); });
 
   // Open every file given; the first one is the one shown.

@@ -185,6 +185,8 @@ Item {
                 required property bool collapsed
                 required property int tabCount
                 required property bool active
+                required property bool missing
+                required property string path
 
                 readonly property bool isGroup: kind === "group"
                 readonly property bool editing: isGroup && root.renamingGroupId === rowId
@@ -229,11 +231,22 @@ Item {
                     }
 
                     Label {
+                        visible: row.missing
+                        text: "⚠"
+                        color: row.active ? colors.highlightedText : "#c07000"
+                        ToolTip.text: qsTr("File not found:\n%1").arg(row.path)
+                        ToolTip.visible: missingHover.hovered
+                        HoverHandler { id: missingHover }
+                    }
+
+                    Label {
                         visible: !row.editing
                         Layout.fillWidth: true
                         text: row.title
                         elide: Text.ElideRight
                         font.bold: row.isGroup && root.controller.activeGroupId === row.rowId
+                        font.italic: row.missing
+                        opacity: row.missing ? 0.6 : 1
                         color: row.active ? colors.highlightedText : colors.text
                     }
 

@@ -22,11 +22,87 @@ QVariantMap NoPosition() {
 
 }  // namespace
 
-TabController::TabController(PositionStore& store, int save_delay_ms, QObject* parent)
-    : QObject(parent), model_(this), store_(store) {
+TabController::TabController(PositionStore& positions, SessionStore& session, int save_delay_ms, QObject* parent)
+    : QObject(parent), model_(this), store_(positions), session_(session) {
   save_timer_.setSingleShot(true);
   save_timer_.setInterval(save_delay_ms);
   connect(&save_timer_, &QTimer::timeout, this, [this] { Flush(); });
+
+  // Session changes are infrequent, so they are saved right away: a timer of 0 ms only merges the several signals one
+  // user action causes into a single write.
+  session_timer_.setSingleShot(true);
+  session_timer_.setInterval(0);
+  connect(&session_timer_, &QTimer::timeout, this, [this] { SaveSession(); });
+  const auto queue = [this] { QueueSessionSave(); };
+  connect(&model_, &QAbstractItemModel::rowsInserted, this, queue);
+  connect(&model_, &QAbstractItemModel::rowsRemoved, this, queue);
+  connect(&model_, &QAbstractItemModel::dataChanged, this, queue);
+  connect(this, &TabController::activeTabChanged, this, queue);
+  connect(this, &TabController::activeGroupChanged, this, queue);
+}
+
+void TabController::QueueSessionSave() {
+  if (restoring_) {
+    return;
+  }
+  session_dirty_ = true;
+  session_timer_.start();
+}
+
+void TabController::SaveSession() {
+  session_timer_.stop();
+  session_dirty_ = false;
+  SessionRecord record;
+  for (int g = 0; g < model_.GroupCount(); ++g) {
+    const Group* group = model_.FindGroup(model_.GroupIdAt(g));
+    GroupRecord saved{.name = group->name, .collapsed = group->collapsed, .tabs = {}};
+    for (const Tab& tab : group->tabs) {
+      saved.tabs.append({.path = tab.path, .file_key = tab.file_key});
+    }
+    record.groups.append(saved);
+  }
+  record.active_group = model_.IndexOfGroup(active_group_id_);
+  const int active_tab = model_.ActiveTabId();
+  if (active_tab >= 0) {
+    record.active_tab_group = model_.IndexOfGroup(model_.GroupOfTab(active_tab));
+    record.active_tab = model_.IndexInGroup(active_tab);
+  }
+  session_.Save(record);
+}
+
+void TabController::Restore() {
+  restoring_ = true;
+  const SessionRecord record = session_.Load();
+  int active_tab_id = -1;
+  int active_group_id = -1;
+  for (int g = 0; g < record.groups.size(); ++g) {
+    const GroupRecord& group = record.groups.at(g);
+    const int group_id = model_.AddGroup(group.name);
+    model_.SetCollapsed(group_id, group.collapsed);
+    if (g == record.active_group) {
+      active_group_id = group_id;
+    }
+    for (int t = 0; t < group.tabs.size(); ++t) {
+      const TabRecord& tab = group.tabs.at(t);
+      const int tab_id = model_.AddTab(group_id, {.id = 0,
+                                                  .path = tab.path,
+                                                  .file_key = tab.file_key,
+                                                  .title = QFileInfo(tab.path).completeBaseName(),
+                                                  .history = {},
+                                                  .missing = !QFileInfo::exists(tab.path)});
+      if (g == record.active_tab_group && t == record.active_tab) {
+        active_tab_id = tab_id;
+      }
+    }
+  }
+  restoring_ = false;
+  if (active_group_id >= 0) {
+    SetActiveGroup(active_group_id);
+  }
+  if (active_tab_id >= 0) {
+    // Not revealed: the sidebar must look exactly as it was left, even with the active tab in a collapsed group.
+    SetActive(active_tab_id, false);
+  }
 }
 
 SessionModel* TabController::model() {
@@ -50,6 +126,16 @@ QUrl TabController::activeUrl() const {
   return tab == nullptr ? QUrl() : QUrl::fromLocalFile(tab->path);
 }
 
+bool TabController::activeTabMissing() const {
+  const Tab* tab = model_.FindTab(model_.ActiveTabId());
+  return tab != nullptr && tab->missing;
+}
+
+QString TabController::activePath() const {
+  const Tab* tab = model_.FindTab(model_.ActiveTabId());
+  return tab == nullptr ? QString() : tab->path;
+}
+
 QString TabController::activeTitle() const {
   const Tab* tab = model_.FindTab(model_.ActiveTabId());
   return tab == nullptr ? QString() : tab->title;
@@ -68,6 +154,13 @@ bool TabController::openFile(const QUrl& url) {
     return false;
   }
   int tab_id = model_.TabIdWithKey(key);
+  if (tab_id >= 0 && model_.FindTab(tab_id)->missing) {
+    // The same file turned up somewhere else (or is back): the tab that lost it follows it.
+    model_.RelinkTab(tab_id, path, key, QFileInfo(path).completeBaseName());
+    if (tab_id == model_.ActiveTabId()) {
+      ReloadActive();
+    }
+  }
   if (tab_id < 0) {
     int group_id = model_.FindGroup(active_group_id_) != nullptr ? active_group_id_ : -1;
     if (group_id < 0) {
@@ -104,14 +197,68 @@ void TabController::closeTab(int tab_id) {
 }
 
 void TabController::activate(int tab_id) {
-  if (model_.FindTab(tab_id) == nullptr || tab_id == model_.ActiveTabId()) {
+  const Tab* tab = model_.FindTab(tab_id);
+  if (tab == nullptr || tab_id == model_.ActiveTabId()) {
     return;
   }
   Flush();
+  // The file may have gone, or come back, since the tab was last shown.
+  model_.SetTabMissing(tab_id, !QFileInfo::exists(tab->path));
   SetActive(tab_id);
 }
 
-void TabController::SetActive(int tab_id) {
+void TabController::ReloadActive() {
+  const Tab* tab = model_.FindTab(model_.ActiveTabId());
+  active_position_ = NoPosition();
+  if (tab != nullptr) {
+    if (const auto stored = store_.Load(tab->file_key)) {
+      active_position_ = ToMap(*stored);
+    }
+  }
+  emit activeTabChanged();
+  emit historyChanged();
+}
+
+int TabController::locate(int tab_id, const QUrl& url, bool force) {
+  const Tab* tab = model_.FindTab(tab_id);
+  if (tab == nullptr) {
+    return 3;
+  }
+  const QString path = QFileInfo(url.toLocalFile()).absoluteFilePath();
+  const QString key = FileIdentity::Compute(path);
+  if (key.isEmpty()) {
+    return 1;
+  }
+  if (!force && !tab->file_key.isEmpty() && key != tab->file_key) {
+    return 2;
+  }
+  const int other = model_.TabIdWithKey(key);
+  if (other >= 0 && other != tab_id) {
+    // That file is already open in another tab: keep that one and drop the lost one.
+    const bool was_active = tab_id == model_.ActiveTabId();
+    closeTab(tab_id);
+    if (was_active) {
+      activate(other);
+    }
+    return 0;
+  }
+  model_.RelinkTab(tab_id, path, key, QFileInfo(path).completeBaseName());
+  if (tab_id == model_.ActiveTabId()) {
+    ReloadActive();
+  }
+  return 0;
+}
+
+QVariant TabController::value(const QString& key, const QVariant& default_value) const {
+  const std::optional<QString> stored = session_.Value(key);
+  return stored ? QVariant(*stored) : default_value;
+}
+
+void TabController::setValue(const QString& key, const QVariant& value) {
+  session_.SetValue(key, value.toString());
+}
+
+void TabController::SetActive(int tab_id, bool reveal) {
   model_.SetActiveTab(tab_id);
   active_position_ = NoPosition();
   if (const Tab* tab = model_.FindTab(tab_id)) {
@@ -120,7 +267,9 @@ void TabController::SetActive(int tab_id) {
     }
     // A tab inside a collapsed group would be invisible, so show it.
     const int group_id = model_.GroupOfTab(tab_id);
-    model_.SetCollapsed(group_id, false);
+    if (reveal) {
+      model_.SetCollapsed(group_id, false);
+    }
     SetActiveGroup(group_id);
   }
   emit activeTabChanged();
@@ -292,6 +441,9 @@ void TabController::reportPosition(int page, double offset_y, double zoom) {
 }
 
 void TabController::Flush() {
+  if (session_dirty_) {
+    SaveSession();
+  }
   save_timer_.stop();
   if (!has_pending_) {
     return;

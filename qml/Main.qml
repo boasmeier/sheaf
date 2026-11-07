@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
+import QtQuick.Window
 
 ApplicationWindow {
     id: window
@@ -10,15 +11,19 @@ ApplicationWindow {
     readonly property alias viewer: viewer
     readonly property alias sidebar: sidebar
     readonly property alias deleteGroupDialog: deleteGroupDialog
+    readonly property alias missingPanel: missingPanel
+    readonly property alias mismatchDialog: mismatchDialog
+    readonly property alias infoDialog: infoDialog
 
     visible: true
     width: 1100
     height: 750
     title: tabs.activeTabId >= 0 ? qsTr("%1 – sheaf").arg(tabs.activeTitle) : "sheaf"
 
-    // Shows whichever tab is active; only that tab's document is loaded.
+    // Shows whichever tab is active; only that tab's document is loaded. A tab whose file is gone shows the "File not
+    // found" panel instead.
     function showActiveTab() {
-        if (tabs.activeTabId < 0)
+        if (tabs.activeTabId < 0 || tabs.activeTabMissing)
             viewer.close()
         else
             viewer.open(tabs.activeUrl, tabs.activePosition)
@@ -51,7 +56,113 @@ ApplicationWindow {
         externalDialog.open()
     }
 
-    Component.onCompleted: showActiveTab()
+    // --- Missing files ---
+
+    // The file the user picked for the active (missing) tab, waiting for the answer to "different file, use anyway?".
+    property url pendingLocateUrl
+
+    function locateActiveTab(url) {
+        const result = tabs.locate(tabs.activeTabId, url, false)
+        if (result === 2) {
+            pendingLocateUrl = url
+            mismatchDialog.open()
+        } else if (result === 1) {
+            infoDialog.text = qsTr("That file cannot be read.")
+            infoDialog.open()
+        }
+    }
+
+    FileDialog {
+        id: locateDialog
+        title: qsTr("Locate the PDF")
+        nameFilters: [qsTr("PDF files (*.pdf)"), qsTr("All files (*)")]
+        onAccepted: window.locateActiveTab(selectedFile)
+    }
+
+    Dialog {
+        id: mismatchDialog
+        title: qsTr("Different file?")
+        modal: true
+        anchors.centerIn: parent
+        standardButtons: Dialog.Yes | Dialog.No
+        onAccepted: tabs.locate(tabs.activeTabId, window.pendingLocateUrl, true)
+        Label {
+            text: qsTr("This does not look like the file that was open here. Use it anyway?")
+            wrapMode: Text.Wrap
+            width: 320
+        }
+    }
+
+    Dialog {
+        id: infoDialog
+        property alias text: infoLabel.text
+        modal: true
+        anchors.centerIn: parent
+        standardButtons: Dialog.Ok
+        Label { id: infoLabel; wrapMode: Text.Wrap; width: 320 }
+    }
+
+    // --- Window size and position, remembered between runs ---
+
+    property bool windowStateReady: false
+
+    function restoreWindowState() {
+        const w = Number(tabs.value("window_width", 0))
+        const h = Number(tabs.value("window_height", 0))
+        if (w >= 480 && h >= 320) {
+            width = Math.min(w, Screen.desktopAvailableWidth)
+            height = Math.min(h, Screen.desktopAvailableHeight)
+        }
+        // Position: honoured on X11 and Windows; a Wayland compositor decides by itself.
+        const savedX = tabs.value("window_x", "")
+        const savedY = tabs.value("window_y", "")
+        if (savedX !== "" && savedY !== "") {
+            const nx = Number(savedX), ny = Number(savedY)
+            if (nx >= 0 && ny >= 0 && nx < Screen.desktopAvailableWidth - 100 && ny < Screen.desktopAvailableHeight - 100) {
+                x = nx
+                y = ny
+            }
+        }
+        if (tabs.value("window_maximized", "false") === "true")
+            visibility = Window.Maximized
+    }
+
+    function saveWindowState() {
+        if (!windowStateReady)
+            return
+        if (visibility === Window.Windowed) {
+            tabs.setValue("window_width", width)
+            tabs.setValue("window_height", height)
+            tabs.setValue("window_x", x)
+            tabs.setValue("window_y", y)
+        }
+        tabs.setValue("window_maximized", visibility === Window.Maximized)
+        tabs.setValue("sidebar_width", sidebar.width)
+    }
+
+    Timer {
+        id: windowStateTimer
+        interval: 500
+        onTriggered: window.saveWindowState()
+    }
+
+    onWidthChanged: windowStateTimer.restart()
+    onHeightChanged: windowStateTimer.restart()
+    onXChanged: windowStateTimer.restart()
+    onYChanged: windowStateTimer.restart()
+    onVisibilityChanged: windowStateTimer.restart()
+
+    // Every way of quitting (window close, Ctrl+Q, SIGTERM at logout) ends in aboutToQuit.
+    Connections {
+        target: Qt.application
+        function onAboutToQuit() { window.saveWindowState() }
+    }
+
+    Component.onCompleted: {
+        restoreWindowState()
+        windowStateReady = true
+        showActiveTab()
+    }
 
     Dialog {
         id: externalDialog
@@ -173,27 +284,82 @@ ApplicationWindow {
 
         Sidebar {
             id: sidebar
-            SplitView.preferredWidth: 240
+            // The width of last time, read when the window is created; dragging the handle replaces this binding.
+            SplitView.preferredWidth: {
+                const saved = Number(tabs.value("sidebar_width", 240))
+                return saved >= 140 && saved < 2000 ? saved : 240
+            }
             SplitView.minimumWidth: 140
             SplitView.fillHeight: true
             controller: tabs
             onDeleteGroupRequested: groupId => window.deleteGroup(groupId)
         }
 
-        Viewer {
-            id: viewer
+        Item {
             SplitView.fillWidth: true
             SplitView.fillHeight: true
-            focus: true
 
-            onLinkFollowed: from => tabs.recordJump(from.page, from.offsetY, from.zoom)
-            onExternalLinkRequested: url => window.askToOpenExternally(url)
-            onBackRequested: window.navigateBack()
-            onForwardRequested: window.navigateForward()
+            Viewer {
+                id: viewer
+                anchors.fill: parent
+                focus: true
 
-            onViewMoved: {
-                const top = topPosition()
-                tabs.reportPosition(top.page, top.offset, zoom)
+                onLinkFollowed: from => tabs.recordJump(from.page, from.offsetY, from.zoom)
+                onExternalLinkRequested: url => window.askToOpenExternally(url)
+                onBackRequested: window.navigateBack()
+                onForwardRequested: window.navigateForward()
+
+                onViewMoved: {
+                    const top = topPosition()
+                    tabs.reportPosition(top.page, top.offset, zoom)
+                }
+            }
+
+            // Shown instead of the document when the active tab's file is gone.
+            Rectangle {
+                id: missingPanel
+                anchors.fill: parent
+                visible: tabs.activeTabId >= 0 && tabs.activeTabMissing
+                color: palette.window
+
+                ColumnLayout {
+                    anchors.centerIn: parent
+                    width: Math.min(parent.width - 40, 480)
+                    spacing: 12
+
+                    Label {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: "⚠"
+                        font.pixelSize: 40
+                        color: "#c07000"
+                    }
+                    Label {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: qsTr("File not found")
+                        font.pixelSize: 22
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WrapAnywhere
+                        textFormat: Text.PlainText
+                        opacity: 0.7
+                        text: tabs.activePath
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.Wrap
+                        opacity: 0.7
+                        text: qsTr("It was moved, renamed or deleted. Your place in it is remembered.")
+                    }
+                    RowLayout {
+                        Layout.alignment: Qt.AlignHCenter
+                        spacing: 8
+                        Button { text: qsTr("Locate…"); onClicked: locateDialog.open() }
+                        Button { text: qsTr("Remove tab"); onClicked: tabs.closeTab(tabs.activeTabId) }
+                    }
+                }
             }
         }
     }

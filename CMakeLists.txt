@@ -27,6 +27,8 @@ add_library(sheaf_core STATIC
   src/storage/Database.cpp
   src/storage/Database.h
   src/storage/PositionStore.cpp
+  src/storage/SessionStore.cpp
+  src/storage/SessionStore.h
   src/storage/PositionStore.h
   src/util/FileIdentity.cpp
   src/util/FileIdentity.h
@@ -35,6 +37,8 @@ add_library(sheaf_core STATIC
   src/app/SessionModel.cpp
   src/app/SessionModel.h
   src/app/TabController.cpp
+  src/app/UnixSignals.cpp
+  src/app/UnixSignals.h
   src/app/TabController.h
 )
 target_include_directories(sheaf_core PUBLIC src)

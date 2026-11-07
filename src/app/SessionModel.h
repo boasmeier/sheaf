@@ -15,6 +15,7 @@ struct Tab {
   QString file_key;
   QString title;
   NavigationHistory history;  // in memory only
+  bool missing = false;       // the file is not at `path` (any more)
 };
 
 struct Group {
@@ -54,6 +55,7 @@ public:
     TabCountRole,   // groups only
     ActiveRole,     // tabs only: is this the active tab
     PathRole,       // tabs only
+    MissingRole,    // tabs only: the file was not found
   };
 
   explicit SessionModel(QObject* parent = nullptr);
@@ -77,6 +79,10 @@ public:
   // group does not exist).
   int AddTab(int group_id, Tab tab, int index = -1);
   bool RemoveTab(int tab_id);
+  // Marks the tab's file as found or not found.
+  bool SetTabMissing(int tab_id, bool missing);
+  // Points the tab at another file (relinking after the file moved): new path, key and title; no longer missing.
+  bool RelinkTab(int tab_id, const QString& path, const QString& file_key, const QString& title);
   // Moves the tab so it ends up at `index` within the group (clamped), possibly another group.
   bool MoveTab(int tab_id, int group_id, int index);
   // Moves the tab one place down (+1) or up (-1) in the order of all tabs; past the end of a group it moves into the

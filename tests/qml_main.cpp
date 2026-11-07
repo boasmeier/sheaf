@@ -4,8 +4,10 @@
 #include "app/TabController.h"
 #include "storage/Database.h"
 #include "storage/PositionStore.h"
+#include "storage/SessionStore.h"
 
 #include <QCoreApplication>
+#include <QFile>
 #include <QQmlContext>
 #include <QQmlEngine>
 #include <QTemporaryDir>
@@ -75,7 +77,8 @@ public slots:
       many.append(QUrl::fromLocalFile(path));
     }
     positions_ = std::make_unique<sheaf::PositionStore>(database_);
-    tabs_ = std::make_unique<sheaf::TabController>(*positions_);
+    sessions_ = std::make_unique<sheaf::SessionStore>(database_);
+    tabs_ = std::make_unique<sheaf::TabController>(*positions_, *sessions_);
 
     // Optional: real documents for tests/qml/tst_realpdfs.qml, e.g. SHEAF_TEST_PDFS="/a/one.pdf:/b/two.pdf".
     QVariantList real_pdfs;
@@ -84,6 +87,8 @@ public slots:
     }
     engine->rootContext()->setContextProperty("realPdfs", real_pdfs);
 
+    engine_ = engine;
+    engine->rootContext()->setContextProperty("control", this);
     engine->rootContext()->setContextProperty("keys", &keys_);
     engine->rootContext()->setContextProperty("tabs", tabs_.get());
     engine->rootContext()->setContextProperty("fixtures", QVariantMap{{"alpha", QUrl::fromLocalFile(alpha)},
@@ -96,17 +101,49 @@ public slots:
 
   // NOLINTNEXTLINE(readability-redundant-access-specifiers): the slots above are public too
 public:
+  // --- Used by the QML tests (context property "control") ---
+
+  // Quits and starts again: saves like the application does on exit, throws the controller away and builds a new one
+  // from what is in the database, exactly as main() does at start-up. Close every window before calling this.
+  // NOLINTNEXTLINE(readability-identifier-naming): QML-facing API
+  Q_INVOKABLE void restart() {
+    tabs_->Flush();
+    tabs_.reset();
+    tabs_ = std::make_unique<sheaf::TabController>(*positions_, *sessions_);
+    tabs_->Restore();
+    engine_->rootContext()->setContextProperty("tabs", tabs_.get());
+  }
+
+  // A path in a scratch directory for files the tests create, copy, move and delete.
+  // NOLINTNEXTLINE(readability-identifier-naming): QML-facing API
+  Q_INVOKABLE QString tempPath(const QString& name) const { return dir_.filePath("work-" + name); }
+
+  // NOLINTNEXTLINE(readability-identifier-naming): QML-facing API
+  Q_INVOKABLE bool copyFile(const QUrl& from, const QString& to) const {
+    QFile::remove(to);
+    return QFile::copy(from.toLocalFile(), to);
+  }
+
+  // NOLINTNEXTLINE(readability-identifier-naming): QML-facing API
+  Q_INVOKABLE bool removeFile(const QString& path) const { return QFile::remove(path); }
+
+  // NOLINTNEXTLINE(readability-identifier-naming): QML-facing API
+  Q_INVOKABLE bool renameFile(const QString& from, const QString& to) const { return QFile::rename(from, to); }
+
   void Release() {
     tabs_.reset();
+    sessions_.reset();
     positions_.reset();
     database_.Close();
   }
 
 private:
+  QQmlEngine* engine_ = nullptr;
   KeyInjector keys_;
   QTemporaryDir dir_;
   sheaf::Database database_{"qmltests"};
   std::unique_ptr<sheaf::PositionStore> positions_;
+  std::unique_ptr<sheaf::SessionStore> sessions_;
   std::unique_ptr<sheaf::TabController> tabs_;
 };
 

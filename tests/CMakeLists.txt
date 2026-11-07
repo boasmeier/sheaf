@@ -1,4 +1,4 @@
-foreach(name database fileidentity positionstore navigationhistory sessionmodel tabcontroller)
+foreach(name database fileidentity positionstore sessionstore navigationhistory sessionmodel tabcontroller)
   qt_add_executable(tst_${name} tst_${name}.cpp)
   target_link_libraries(tst_${name} PRIVATE sheaf_core Qt6::Test)
   sheaf_set_warnings(tst_${name})
@@ -16,3 +16,12 @@ add_test(NAME tst_qml COMMAND tst_qml)
 set_tests_properties(tst_qml PROPERTIES
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software"
   TIMEOUT 300)
+
+# Starts the real application and quits it with signals, like a logout does.
+qt_add_executable(tst_quit tst_quit.cpp)
+target_link_libraries(tst_quit PRIVATE sheaf_core Qt6::Test Qt6::Gui)
+target_compile_definitions(tst_quit PRIVATE SHEAF_BINARY="$<TARGET_FILE:sheaf>")
+add_dependencies(tst_quit sheaf)
+sheaf_set_warnings(tst_quit)
+add_test(NAME tst_quit COMMAND tst_quit)
+set_tests_properties(tst_quit PROPERTIES TIMEOUT 180 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
