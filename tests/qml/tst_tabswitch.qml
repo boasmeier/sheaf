@@ -39,16 +39,6 @@ Item {
             SignalSpy { signalName: "switched" }
         }
 
-        function freshFingerprint() {
-            const flick = win.viewer.pane.flickable()
-            const y = flick.contentY
-            flick.contentY = y + 6000
-            wait(400)
-            flick.contentY = y
-            wait(600)
-            return Helpers.fingerprint(grabImage(win.contentItem))
-        }
-
         function test_switching_tabs_restores_and_renders_the_left_page() {
             for (const group of tabs.groups())
                 tabs.deleteGroup(group.id)
@@ -69,8 +59,14 @@ Item {
                 compare(win.viewer.currentPage, remembered[tab])
 
                 // Nothing wrong on screen the moment the switch completes.
-                const immediate = Helpers.fingerprint(grabImage(win.contentItem))
-                compare(immediate, freshFingerprint(), "wrong page image after switch " + i)
+                const immediate = grabImage(win.contentItem)
+                const result = Helpers.checkFixturePages(win.viewer.pane.flickable(), win.contentItem, immediate)
+                verify(result.checked > 0, "no page was visible to check (switch " + i + ")")
+                compare(result.problems.join("; "), "", "wrong page image right after switch " + i)
+                wait(800)
+                const fraction = Helpers.differingFraction(immediate, grabImage(win.contentItem))
+                verify(fraction < Helpers.sameThreshold, "the picture changed by itself after switch " + i + ": "
+                       + (fraction * 100).toFixed(1) + "% of pixels differ")
 
                 // Move somewhere new and let the position settle and be reported.
                 const page = targets[i % targets.length] % (tab === 0 ? 150 : 180)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QByteArray>
+#include <QColor>
 #include <QFile>
 #include <QFont>
 #include <QPageSize>
@@ -33,6 +34,10 @@ inline bool WritePdfFixture(const QString& path, const QString& label, int pages
       writer.newPage();
     }
     const QRect area(0, 0, writer.width(), writer.height());
+    // A page-dependent background shade: neighbouring pages differ by at least 60 grey levels, so a wrong page is
+    // obvious to the tests even where the text is small.
+    const int shade = 40 + ((page * 61) % 170);
+    painter.fillRect(area, QColor(shade, shade, shade));
     painter.drawText(area, Qt::AlignCenter, QString("%1\npage %2").arg(label).arg(page + 1));
     painter.drawRect(area.adjusted(10, 10, -10, -10));
     // A page-dependent bar, so neighbouring pages differ even at a glance.

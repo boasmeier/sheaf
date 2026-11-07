@@ -1,5 +1,6 @@
 import QtQuick
 import QtTest
+import "helpers.js" as Helpers
 
 // Groups and tabs through the real window: keyboard shortcuts, the sidebar showing the right document, and deleting
 // a group. Keys are sent to the application window itself.
@@ -156,6 +157,28 @@ Item {
             win.deleteGroupDialog.accept()
             tryVerify(() => !win.viewer.hasDocument, 5000)
             compare(tabs.activeTabId, -1)
+        }
+
+        function test_a_zoomed_document_never_covers_the_sidebar() {
+            build()
+            tryVerify(() => win.viewer.hasDocument, 5000)
+            wait(500)
+            const width = win.sidebar.width
+            verify(width > 100)
+            const before = Helpers.fingerprintRegion(grabImage(win.contentItem), 0, 0, width, win.contentItem.height)
+            verify(before !== 0)
+            for (let i = 0; i < 8; ++i)
+                win.viewer.zoomIn()  // far wider than the window
+            wait(800)
+            verify(win.viewer.zoom > 3)
+            // Scrolled sideways, the page moves left, towards (and under) the sidebar.
+            win.viewer.pane.flickable().contentX = 1200
+            wait(500)
+            const afterImage = grabImage(win.contentItem)
+            const after = Helpers.fingerprintRegion(afterImage, 0, 0, width, win.contentItem.height)
+            compare(after, before, "the zoomed page was drawn over the sidebar")
+            // Neither may the toolbar above be affected: the viewer stays inside its own area.
+            verify(win.viewer.clip)
         }
 
         function test_switching_tabs_across_groups_shows_the_right_document() {

@@ -43,6 +43,20 @@ Item {
     opacity: shown ? 1 : 0
     z: shown ? 1 : 0
     property var pendingRestore: null
+    // Where a restore is heading ({page, offset}), or null; the pane is not ready before the view is there.
+    property var restoreTarget: null
+
+    // Is the view at the restore target? The view finishes jumps a little later by itself, and a target near the end of
+    // the document can never be reached exactly, so being at the very bottom counts as arrived.
+    function restoreReached() {
+        if (!restoreTarget)
+            return true
+        const flick = flickable()
+        const top = topPosition()
+        if (top.page === restoreTarget.page && Math.abs(top.offset - restoreTarget.offset) < 0.015)
+            return true
+        return flick.contentY >= flick.originY + flick.contentHeight - flick.height - 1
+    }
 
     // Loads `url`, restoring `position` ({valid, page, offsetY, zoom}) or fitting the width if it is not valid.
     function open(url, position) {
@@ -83,10 +97,13 @@ Item {
             return
         const position = pendingRestore
         pendingRestore = null
-        if (position && position.valid)
+        if (position && position.valid) {
+            restoreTarget = { page: Math.max(0, Math.min(position.page, pageCount - 1)), offset: position.offsetY }
             jumpTo(position)
-        else
+        } else {
+            restoreTarget = null
             fitWidth()
+        }
         settleTimer.restart()
         readyTimer.ticks = 0
         readyTimer.restart()
@@ -134,8 +151,16 @@ Item {
             setZoom((width - 16) / document.pagePointSize(0).width)
     }
 
+    // Keeps the table's width in step with the widest page (see readyTimer); also for later changes.
+    function relayout() {
+        const flick = flickable()
+        if (flick)
+            flick.forceLayout()
+    }
+
     PdfDocument {
         id: document
+        onMaxPageWidthChanged: root.relayout()
         onStatusChanged: function (status) {
             // Nothing to wait for if the file cannot be opened; let Viewer show the error.
             if (status === PdfDocument.Error)
@@ -171,6 +196,14 @@ Item {
         return images
     }
 
+    function onRowsAvailable() {
+        const flick = flickable()
+        if (flick.rows > 0) {
+            flick.rowsChanged.disconnect(root.onRowsAvailable)
+            applyPending()
+        }
+    }
+
     function onScrolled() {
         pageTimer.restart()
         if (settled)
@@ -202,8 +235,16 @@ Item {
         property int ticks: 0
         onTriggered: {
             const images = root.fixPageImages()
-            const rendered = images.length > 0 && images.every(image => image.status === Image.Ready)
-            if (rendered || ++ticks > 100) {
+            // "Ready" alone is not enough: for a heavy page the status flips before any picture exists (painted size 0).
+            const rendered = images.length > 0
+                             && images.every(image => image.status === Image.Ready && image.paintedWidth > 0)
+            // The table is as wide as the widest page, which the document reports a moment after the table was laid
+            // out, and the table does not notice. Re-lay it out until it agrees, or the pages jump sideways later.
+            const flick = root.flickable()
+            const layoutSettled = Math.abs(flick.contentWidth - flick.columnWidthProvider(0)) < 0.5
+            if (!layoutSettled)
+                flick.forceLayout()
+            if ((rendered && layoutSettled && root.restoreReached()) || ++ticks > 100) {
                 stop()
                 root.ready = true
             }
@@ -231,8 +272,14 @@ Item {
         }
         onLoaded: {
             // Connect explicitly: a Connections element would have to re-resolve the table inside the view.
-            root.flickable().contentYChanged.connect(root.onScrolled)
-            root.applyPending()
+            const flick = root.flickable()
+            flick.contentYChanged.connect(root.onScrolled)
+            // Jump only once the table has its rows. Called earlier, the view queues the jump and runs it later by
+            // itself, after we may already have decided the pane is ready: the page would then move after it was shown.
+            if (flick.rows > 0)
+                root.applyPending()
+            else
+                flick.rowsChanged.connect(root.onRowsAvailable)
         }
     }
 

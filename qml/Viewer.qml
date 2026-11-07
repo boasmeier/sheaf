@@ -9,6 +9,10 @@ import QtQuick.Pdf
 Item {
     id: root
 
+    // A zoomed page is far wider than the viewer; Flickable does not clip its content by default, so without this the
+    // page would be drawn over the sidebar next to it.
+    clip: true
+
     // Two slots: one shows a pane, the other loads the next one.
     property bool firstSlotShown: true
     readonly property Loader shownLoader: firstSlotShown ? slotA : slotB

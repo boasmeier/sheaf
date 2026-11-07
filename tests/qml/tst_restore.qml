@@ -40,17 +40,6 @@ Item {
             tryVerify(() => switchedSpy.count > count, 10000)
         }
 
-        // The rendered result after scrolling away and back: what a correct render of the current spot looks like.
-        function freshFingerprint() {
-            const flick = viewer.pane.flickable()
-            const y = flick.contentY
-            flick.contentY = y + 6000
-            wait(400)
-            flick.contentY = y
-            wait(600)
-            return Helpers.fingerprint(grabImage(viewer))
-        }
-
         function test_restores_exact_position() {
             openAndWait(fixtures.alpha, { valid: false })
             viewer.pane.setZoom(1.9)
@@ -103,14 +92,23 @@ Item {
             fuzzyCompare(viewer.topPosition().offset, 0.3, 0.01)
         }
 
-        function test_page_images_match_a_fresh_render_right_after_the_switch() {
+        // Right after each switch every visible page must show its own picture (each fixture page has its own shade),
+        // and the picture must not change by itself afterwards (no late jump or re-render).
+        function test_the_right_pages_are_shown_right_after_the_switch() {
             const positions = [[fixtures.alpha, 60], [fixtures.beta, 120], [fixtures.alpha, 100], [fixtures.beta, 40],
-                               [fixtures.alpha, 140], [fixtures.beta, 170]]
+                               [fixtures.alpha, 140], [fixtures.beta, 170], [fixtures.beta, 3], [fixtures.alpha, 0]]
             for (const p of positions) {
                 openAndWait(p[0], { valid: true, page: p[1], offsetY: 0.2, zoom: 1.0 })
                 // Grab immediately: nothing wrong may be on screen at the moment the new document appears.
-                const immediate = Helpers.fingerprint(grabImage(viewer))
-                compare(immediate, freshFingerprint(), "wrong page image after switching to page " + p[1])
+                const immediate = grabImage(viewer)
+                const result = Helpers.checkFixturePages(viewer.pane.flickable(), viewer, immediate)
+                verify(result.checked > 0, "no page was visible to check after switching to page " + p[1])
+                compare(result.problems.join("; "), "", "wrong page image right after switching to page " + p[1])
+
+                wait(800)
+                const fraction = Helpers.differingFraction(immediate, grabImage(viewer))
+                verify(fraction < Helpers.sameThreshold, "the picture changed by itself after the switch to page " + p[1]
+                       + ": " + (fraction * 100).toFixed(1) + "% of pixels differ")
             }
         }
 

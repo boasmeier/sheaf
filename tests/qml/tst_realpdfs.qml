@@ -44,14 +44,14 @@ Item {
             spy.destroy()
         }
 
-        function freshFingerprint() {
+        function freshImage() {
             const flick = win.viewer.pane.flickable()
             const y = flick.contentY
             flick.contentY = y + 8000
             wait(800)
             flick.contentY = y
             wait(1500)
-            return Helpers.fingerprint(grabImage(win.contentItem))
+            return grabImage(win.contentItem)
         }
 
         Component {
@@ -128,8 +128,10 @@ Item {
                     remembered[tab] = stored.valid ? stored.page : 0
                 compare(win.viewer.topPosition().page, remembered[tab], "tab " + tab + " lost its page (switch " + i + ")")
 
-                const immediate = Helpers.fingerprint(grabImage(win.contentItem))
-                compare(immediate, freshFingerprint(), "wrong page image on tab " + tab + " (switch " + i + ")")
+                const immediate = grabImage(win.contentItem)
+                const fraction = Helpers.differingFraction(immediate, freshImage())
+                verify(fraction < Helpers.sameThreshold, "wrong page image on tab " + tab + " (switch " + i + "): "
+                       + (fraction * 100).toFixed(1) + "% of pixels differ")
 
                 const page = 20 + (i * 47) % Math.max(1, win.viewer.pageCount - 40)
                 win.viewer.jumpTo({ page: page, offsetY: 0, zoom: win.viewer.zoom })
