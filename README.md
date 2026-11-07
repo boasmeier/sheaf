@@ -1,5 +1,12 @@
 # Sheaf
 
+A minimal, fast PDF viewer for students: tabs in collapsible groups, remembered reading positions, a back/forward
+history for links, fast full-text search, and session restore. Built with C++20 and Qt 6 (Qt Quick, Qt PDF), for
+Linux first.
+
+Milestones M1 to M6 of [PLAN.md](PLAN.md) are implemented (viewer, tabs and position memory, link navigation,
+sidebar with groups, session restore, search).
+
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
@@ -83,3 +90,13 @@ ctest --test-dir build --output-on-failure
   ```
 
 `scripts/tidy.sh` runs clang-tidy on all sources.
+
+## License
+
+Copyright (C) 2026 Boas Meier. Sheaf is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your
+option) any later version. It is distributed in the hope that it will be useful, but without any warranty. See
+[LICENSE](LICENSE) for the full text.
+
+`qml/SheafPdfView.qml` is a modified copy of Qt's `PdfMultiPageView.qml`, which Qt offers under the GPL-3.0 among
+other licenses; its original copyright and license lines are kept in the file.
