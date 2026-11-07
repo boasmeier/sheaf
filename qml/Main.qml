@@ -131,7 +131,7 @@ ApplicationWindow {
             Layout.fillHeight: true
             focus: true
 
-            onViewChanged: {
+            onViewMoved: {
                 const top = topPosition()
                 tabs.reportPosition(top.page, top.offset, zoom)
             }

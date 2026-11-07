@@ -43,7 +43,7 @@ qt_add_executable(sheaf src/main.cpp)
 qt_add_qml_module(sheaf
   URI Sheaf
   VERSION 1.0
-  QML_FILES qml/Main.qml qml/Viewer.qml
+  QML_FILES qml/Main.qml qml/Viewer.qml qml/PdfPane.qml
 )
 target_link_libraries(sheaf PRIVATE sheaf_core Qt6::Quick Qt6::Pdf Qt6::PdfQuick)
 sheaf_set_warnings(sheaf)
