@@ -19,6 +19,9 @@ int main(int argc, char* argv[]) {
   QGuiApplication app(argc, argv);
   QGuiApplication::setApplicationName("sheaf");
   QGuiApplication::setOrganizationName("sheaf");
+  // Names the launcher (sheaf.desktop): under Wayland this is the window's app id, which is how GNOME matches the
+  // running window to its icon and dock entry.
+  QGuiApplication::setDesktopFileName("sheaf");
 
   sheaf::Database database("main");
   if (!database.Open(sheaf::Database::DefaultPath())) {

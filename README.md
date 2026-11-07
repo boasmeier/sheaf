@@ -30,6 +30,32 @@ cmake --build build
 
 Open a PDF with Ctrl+O, or pass it on the command line: `./build/sheaf file.pdf`.
 
+## Install
+
+To run Sheaf like any other app (app grid, dock, "Open With" for PDFs), build it in Release mode and install it. For
+yourself only, without root:
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+cmake --install build --prefix ~/.local
+```
+
+This installs the program (`~/.local/bin/sheaf`), a launcher (`~/.local/share/applications/sheaf.desktop`) and an icon.
+Then, on GNOME, press Super, type "Sheaf", and right-click it to add it to the dock (Add to Favorites). PDFs in Files
+offer "Open With Sheaf"; to make it the default, use Properties, Open With. The launcher names the program by its full
+path, so `~/.local/bin` does not need to be in your `PATH` for it (it does for typing `sheaf` in a terminal). The install
+also refreshes the icon and desktop caches (a stale icon cache left by another app would otherwise hide the icon and show
+a placeholder). If GNOME still shows a placeholder, restart Sheaf, and if that does not help, log out and in: the shell
+keeps its own copy of the icon theme.
+
+For all users: `sudo cmake --install build --prefix /usr/local`. Packagers can use `DESTDIR` as usual.
+
+To uninstall, remove what the install listed: `xargs rm < build/install_manifest.txt`. Your tabs and reading positions
+are in `~/.local/share/sheaf/sheaf/sheaf.db` and stay until you delete that file.
+
+## Keys
+
 | Key                                        | Action                                                           |
 |--------------------------------------------|------------------------------------------------------------------|
 | Ctrl+O                                     | Open                                                             |

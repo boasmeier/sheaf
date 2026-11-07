@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Sheaf
+GenericName=PDF Viewer
+Comment=A minimal, fast PDF viewer for students
+Keywords=PDF;Document;Reader;Viewer;Lecture;
+# Filled in when installing, with the absolute path of the installed program.
+Exec=@SHEAF_EXEC@ %F
+Icon=sheaf
+Terminal=false
+Categories=Office;Viewer;
+MimeType=application/pdf;
+StartupNotify=true

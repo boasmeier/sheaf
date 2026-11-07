@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (C) 2026 Boas Meier -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a74c0"/>
+      <stop offset="1" stop-color="#1f4a86"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#background)"/>
+  <!-- three sheets fanned out like a sheaf, tied at the bottom -->
+  <g transform="translate(64 106)">
+    <g transform="rotate(-16)">
+      <rect x="-27" y="-84" width="54" height="76" rx="5" fill="#ffffff" opacity="0.5"/>
+    </g>
+    <g transform="rotate(16)">
+      <rect x="-27" y="-84" width="54" height="76" rx="5" fill="#ffffff" opacity="0.75"/>
+    </g>
+    <rect x="-27" y="-84" width="54" height="76" rx="5" fill="#ffffff"/>
+    <g fill="#9bb4d6">
+      <rect x="-17" y="-70" width="34" height="5" rx="2.5"/>
+      <rect x="-17" y="-58" width="34" height="5" rx="2.5"/>
+      <rect x="-17" y="-46" width="34" height="5" rx="2.5"/>
+      <rect x="-17" y="-34" width="22" height="5" rx="2.5"/>
+    </g>
+  </g>
+  <rect x="42" y="98" width="44" height="9" rx="4.5" fill="#e8b33c"/>
+</svg>
