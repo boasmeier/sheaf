@@ -57,6 +57,8 @@ Item {
             fitWidth()
         }
         settleTimer.restart()
+        refreshTimer.runs = 0
+        refreshTimer.restart()
     }
 
     // Page at the top of the viewport and how far (0..1) it is scrolled; this is what gets saved.
@@ -105,22 +107,61 @@ Item {
         id: document
     }
 
-    Connections {
-        target: root.flickable()
-        function onContentYChanged() {
-            pageTimer.restart()
-            if (root.settled)
-                root.viewMoved()
+    // PdfPageImage clamps currentFrame to 0 if it is set before its document is ready, and never re-applies it, so a
+    // page created for a jump target can show page 1 while its delegate index is the target page. Re-binding
+    // currentFrame to the delegate index makes the image load the right page (and keeps the binding intact).
+    function fixPageImages() {
+        const flick = flickable()
+        if (!flick || !hasDocument)
+            return
+        const first = Math.max(0, flick.cellAtPos(view.width / 2, 1).y)
+        const last = Math.min(pageCount - 1, Math.max(first, flick.cellAtPos(view.width / 2, view.height - 1).y))
+        for (let row = first; row <= last; ++row) {
+            const holder = flick.itemAtCell(0, row)
+            if (!holder)
+                continue
+            for (const paper of holder.children) {
+                for (const image of paper.children) {
+                    if (image.currentFrame !== undefined && image.currentFrame !== holder.index)
+                        image.currentFrame = Qt.binding(() => holder.index)
+                }
+            }
         }
     }
 
-    onZoomChanged: if (settled) viewMoved()
+    function onScrolled() {
+        pageTimer.restart()
+        if (settled)
+            moveTimer.restart()
+    }
+
+    onZoomChanged: if (settled) moveTimer.restart()
 
     // Updates the current page once layout has caught up; owned by the pane, so it dies with it.
     Timer {
         id: pageTimer
         interval: 0
         onTriggered: root.updateCurrentPage()
+    }
+
+    // Announces a new position only after the view has been still for a moment. Right after a jump the table has not
+    // laid out the target yet, and topPosition() would report garbage (and that garbage would get saved).
+    Timer {
+        id: moveTimer
+        interval: 150
+        onTriggered: root.viewMoved()
+    }
+
+    Timer {
+        id: refreshTimer
+        interval: 300
+        property int runs: 0
+        onTriggered: {
+            root.fixPageImages()
+            // A few passes: the target page may be created a little after the jump.
+            if (++runs < 4)
+                restart()
+        }
     }
 
     Timer {
@@ -140,7 +181,11 @@ Item {
         sourceComponent: PdfMultiPageView {
             document: root.document
         }
-        onLoaded: root.applyPending()
+        onLoaded: {
+            // Connect explicitly: a Connections element would have to re-resolve the table inside the view.
+            root.flickable().contentYChanged.connect(root.onScrolled)
+            root.applyPending()
+        }
     }
 
     // The scrollable item inside PdfMultiPageView (a TableView), which the view does not expose.
