@@ -2,12 +2,19 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Pdf
 
-// Shows one PDF at a time. Every open() builds a brand-new PdfPane (and so a new PdfDocument and view) and drops the
-// previous one, which also releases that document's memory.
+// Shows one PDF at a time. Every open() builds a brand-new PdfPane (and so a new PdfDocument and view) in the
+// background, restores the position, waits until the visible pages are rendered and only then swaps it in. Until
+// then the previous pane stays on screen, so there is never a wrong or half-rendered page. The old pane is destroyed
+// afterwards, which also releases its document's memory.
 Item {
     id: root
 
-    readonly property PdfPane pane: loader.item as PdfPane
+    // Two slots: one shows a pane, the other loads the next one.
+    property bool firstSlotShown: true
+    readonly property Loader shownLoader: firstSlotShown ? slotA : slotB
+    readonly property Loader loadingLoader: firstSlotShown ? slotB : slotA
+
+    readonly property PdfPane pane: shownLoader.item as PdfPane
     readonly property bool hasDocument: pane !== null && pane.hasDocument
     readonly property int pageCount: pane ? pane.pageCount : 0
     readonly property int currentPage: pane ? pane.currentPage : 0
@@ -15,20 +22,28 @@ Item {
 
     // Emitted when scroll position or zoom changed after the document was shown and restored; use topPosition().
     signal viewMoved
+    // Emitted when a newly opened document replaced the previous one on screen.
+    signal switched
 
     property url pendingUrl
     property var pendingPosition: null
 
     // Shows `url`, restoring `position` ({valid, page, offsetY, zoom}) or fitting the width if it is not valid.
     function open(url, position) {
+        // The outgoing pane must not report positions that would be saved for the incoming document's tab.
+        if (pane)
+            pane.freeze()
         pendingUrl = url
         pendingPosition = position
-        loader.sourceComponent = null
-        loader.sourceComponent = paneComponent
+        loadingLoader.sourceComponent = null
+        loadingLoader.sourceComponent = paneComponent
     }
 
     function close() {
-        loader.sourceComponent = null
+        if (pane)
+            pane.freeze()
+        slotA.sourceComponent = null
+        slotB.sourceComponent = null
     }
 
     function topPosition() {
@@ -55,15 +70,34 @@ Item {
             pane.fitWidth()
     }
 
+    function showLoadedPane() {
+        const previous = shownLoader
+        firstSlotShown = !firstSlotShown
+        pane.shown = true
+        previous.sourceComponent = null
+        switched()
+    }
+
     Component {
         id: paneComponent
         PdfPane {
+            id: candidate
             onViewMoved: root.viewMoved()
+            onReadyChanged: {
+                if (ready && root.loadingLoader.item === candidate)
+                    root.showLoadedPane()
+            }
         }
     }
 
     Loader {
-        id: loader
+        id: slotA
+        anchors.fill: parent
+        onLoaded: item.open(root.pendingUrl, root.pendingPosition)
+    }
+
+    Loader {
+        id: slotB
         anchors.fill: parent
         onLoaded: item.open(root.pendingUrl, root.pendingPosition)
     }
@@ -73,7 +107,7 @@ Item {
         visible: !root.hasDocument
         color: palette.placeholderText
         text: root.pane && root.pane.status === PdfDocument.Error ? qsTr("Cannot open this PDF: %1").arg(root.pane.error)
-            : root.pane && root.pane.status === PdfDocument.Loading ? qsTr("Loading…")
+            : root.loadingLoader.item !== null ? qsTr("Loading…")
             : qsTr("Open a PDF with Ctrl+O")
     }
 }

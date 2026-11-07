@@ -31,12 +31,25 @@ Item {
 
     // True once the requested position has been restored; changes before that are not the user's.
     property bool settled: false
+    // True once the restored position is on screen with its page images rendered. Viewer keeps this pane hidden (and
+    // the previous one visible) until then, so no half-rendered or wrong page is ever shown.
+    property bool ready: false
+    // Set by Viewer when this pane is the one on screen.
+    property bool shown: false
+    opacity: shown ? 1 : 0
+    z: shown ? 1 : 0
     property var pendingRestore: null
 
     // Loads `url`, restoring `position` ({valid, page, offsetY, zoom}) or fitting the width if it is not valid.
     function open(url, position) {
         pendingRestore = position
         document.source = url
+    }
+
+    // Stops reporting position changes; used when another document is about to replace this one.
+    function freeze() {
+        settled = false
+        moveTimer.stop()
     }
 
     function applyPending() {
@@ -57,8 +70,8 @@ Item {
             fitWidth()
         }
         settleTimer.restart()
-        refreshTimer.runs = 0
-        refreshTimer.restart()
+        readyTimer.ticks = 0
+        readyTimer.restart()
     }
 
     // Page at the top of the viewport and how far (0..1) it is scrolled; this is what gets saved.
@@ -105,15 +118,22 @@ Item {
 
     PdfDocument {
         id: document
+        onStatusChanged: function (status) {
+            // Nothing to wait for if the file cannot be opened; let Viewer show the error.
+            if (status === PdfDocument.Error)
+                root.ready = true
+        }
     }
 
     // PdfPageImage clamps currentFrame to 0 if it is set before its document is ready, and never re-applies it, so a
     // page created for a jump target can show page 1 while its delegate index is the target page. Re-binding
     // currentFrame to the delegate index makes the image load the right page (and keeps the binding intact).
+    // Returns the page images of the visible rows.
     function fixPageImages() {
         const flick = flickable()
+        const images = []
         if (!flick || !hasDocument)
-            return
+            return images
         const first = Math.max(0, flick.cellAtPos(view.width / 2, 1).y)
         const last = Math.min(pageCount - 1, Math.max(first, flick.cellAtPos(view.width / 2, view.height - 1).y))
         for (let row = first; row <= last; ++row) {
@@ -122,11 +142,15 @@ Item {
                 continue
             for (const paper of holder.children) {
                 for (const image of paper.children) {
-                    if (image.currentFrame !== undefined && image.currentFrame !== holder.index)
+                    if (image.currentFrame === undefined)
+                        continue
+                    if (image.currentFrame !== holder.index)
                         image.currentFrame = Qt.binding(() => holder.index)
+                    images.push(image)
                 }
             }
         }
+        return images
     }
 
     function onScrolled() {
@@ -152,15 +176,19 @@ Item {
         onTriggered: root.viewMoved()
     }
 
+    // After the jump, waits (briefly, bounded) until the visible pages are rendered, then marks the pane ready.
     Timer {
-        id: refreshTimer
-        interval: 300
-        property int runs: 0
+        id: readyTimer
+        interval: 30
+        repeat: true
+        property int ticks: 0
         onTriggered: {
-            root.fixPageImages()
-            // A few passes: the target page may be created a little after the jump.
-            if (++runs < 4)
-                restart()
+            const images = root.fixPageImages()
+            const rendered = images.length > 0 && images.every(image => image.status === Image.Ready)
+            if (rendered || ++ticks > 100) {
+                stop()
+                root.ready = true
+            }
         }
     }
 

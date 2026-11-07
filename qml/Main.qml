@@ -7,6 +7,7 @@ ApplicationWindow {
     id: window
 
     // `tabs` (TabController) is provided by the C++ side.
+    readonly property alias viewer: viewer
 
     visible: true
     width: 1100
