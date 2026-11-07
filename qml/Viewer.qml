@@ -56,6 +56,10 @@ Item {
             const page = Math.max(0, Math.min(position.page, pageCount - 1))
             const scale = Math.max(minZoom, Math.min(maxZoom, position.zoom))
             const pageHeight = document.pagePointSize(page).height
+            // The table still holds the previous document's row heights; rebuild them for this document and
+            // zoom first, or the jump lands in the wrong place and the view ends up at the top.
+            view.renderScale = scale
+            flickable().forceLayout()
             // PdfMultiPageView keeps a 10 px margin above the requested location.
             view.goToLocation(page, Qt.point(0, position.offsetY * pageHeight + 10 / scale), scale)
         } else {
