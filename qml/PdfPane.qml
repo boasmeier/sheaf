@@ -108,13 +108,20 @@ Item {
     Connections {
         target: root.flickable()
         function onContentYChanged() {
-            Qt.callLater(root.updateCurrentPage)
+            pageTimer.restart()
             if (root.settled)
                 root.viewMoved()
         }
     }
 
     onZoomChanged: if (settled) viewMoved()
+
+    // Updates the current page once layout has caught up; owned by the pane, so it dies with it.
+    Timer {
+        id: pageTimer
+        interval: 0
+        onTriggered: root.updateCurrentPage()
+    }
 
     Timer {
         id: settleTimer
@@ -128,7 +135,8 @@ Item {
     Loader {
         id: viewLoader
         anchors.fill: parent
-        active: root.hasDocument
+        // Also wait for a real size: a view created at 0x0 (app start, before the window is laid out) loses the jump.
+        active: root.hasDocument && root.width > 0 && root.height > 0
         sourceComponent: PdfMultiPageView {
             document: root.document
         }
