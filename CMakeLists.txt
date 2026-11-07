@@ -37,19 +37,27 @@ add_library(sheaf_core STATIC
   src/app/SessionModel.cpp
   src/app/SessionModel.h
   src/app/TabController.cpp
+  src/app/QmlTypes.cpp
+  src/app/QmlTypes.h
+  src/search/PdfSearchSession.cpp
+  src/search/PdfSearchSession.h
+  src/search/SearchResults.cpp
+  src/search/SearchResults.h
+  src/search/TextMatcher.cpp
+  src/search/TextMatcher.h
   src/app/UnixSignals.cpp
   src/app/UnixSignals.h
   src/app/TabController.h
 )
 target_include_directories(sheaf_core PUBLIC src)
-target_link_libraries(sheaf_core PUBLIC Qt6::Core Qt6::Sql)
+target_link_libraries(sheaf_core PUBLIC Qt6::Core Qt6::Gui Qt6::Qml Qt6::Pdf Qt6::Sql)
 sheaf_set_warnings(sheaf_core)
 
 qt_add_executable(sheaf src/main.cpp)
 qt_add_qml_module(sheaf
   URI Sheaf
   VERSION 1.0
-  QML_FILES qml/Main.qml qml/Viewer.qml qml/PdfPane.qml qml/SheafPdfView.qml qml/Sidebar.qml
+  QML_FILES qml/Main.qml qml/Viewer.qml qml/PdfPane.qml qml/SheafPdfView.qml qml/Sidebar.qml qml/SearchBar.qml
 )
 target_link_libraries(sheaf PRIVATE sheaf_core Qt6::Quick Qt6::Pdf Qt6::PdfQuick)
 sheaf_set_warnings(sheaf)

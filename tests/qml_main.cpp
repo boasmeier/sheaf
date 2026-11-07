@@ -1,6 +1,7 @@
 // Runs the QML tests in tests/qml against the real QML sources (qml/) with generated fixture PDFs and a real
 // TabController, so they exercise the same code paths as the app.
 #include "Fixtures.h"
+#include "app/QmlTypes.h"
 #include "app/TabController.h"
 #include "storage/Database.h"
 #include "storage/PositionStore.h"
@@ -60,8 +61,12 @@ public slots:
     const QString alpha = dir_.filePath("alpha.pdf");
     const QString beta = dir_.filePath("beta.pdf");
     const QString linked = dir_.filePath("linked.pdf");
+    const QString text = dir_.filePath("text.pdf");
+    const QString scanned = dir_.filePath("scanned.pdf");
     if (!sheaf::testing::WritePdfFixture(alpha, "ALPHA", 150, false) ||
-        !sheaf::testing::WritePdfFixture(beta, "BETA", 180, true) || !sheaf::testing::WritePdfWithLinks(linked, 60)) {
+        !sheaf::testing::WritePdfFixture(beta, "BETA", 180, true) || !sheaf::testing::WritePdfWithLinks(linked, 60) ||
+        !sheaf::testing::WritePdfWithText(text, sheaf::testing::kSearchPages) ||
+        !sheaf::testing::WriteScannedPdf(scanned, 12)) {
       qFatal("Cannot write fixture PDFs");
     }
     // QUICK_TEST_MAIN destroys the application object before this one, and the database needs it to close.
@@ -87,16 +92,24 @@ public slots:
     }
     engine->rootContext()->setContextProperty("realPdfs", real_pdfs);
 
+    sheaf::RegisterQmlTypes();
     engine_ = engine;
     engine->rootContext()->setContextProperty("control", this);
     engine->rootContext()->setContextProperty("keys", &keys_);
     engine->rootContext()->setContextProperty("tabs", tabs_.get());
-    engine->rootContext()->setContextProperty("fixtures", QVariantMap{{"alpha", QUrl::fromLocalFile(alpha)},
-                                                                      {"beta", QUrl::fromLocalFile(beta)},
-                                                                      {"linked", QUrl::fromLocalFile(linked)},
-                                                                      {"many", many},
-                                                                      {"externalUrl", sheaf::testing::kExternalLinkUrl},
-                                                                      {"linkJump", sheaf::testing::kLinkJump}});
+    engine->rootContext()->setContextProperty(
+        "fixtures", QVariantMap{{"alpha", QUrl::fromLocalFile(alpha)},
+                                {"beta", QUrl::fromLocalFile(beta)},
+                                {"linked", QUrl::fromLocalFile(linked)},
+                                {"many", many},
+                                {"text", QUrl::fromLocalFile(text)},
+                                {"scanned", QUrl::fromLocalFile(scanned)},
+                                {"needleCount", sheaf::testing::ExpectedNeedleCount()},
+                                {"commonCount", sheaf::testing::kSearchPages * sheaf::testing::kCommonWordsPerPage},
+                                {"firstNeedlePage", 2},
+                                {"redFoxPage", sheaf::testing::kRedFoxPage},
+                                {"externalUrl", sheaf::testing::kExternalLinkUrl},
+                                {"linkJump", sheaf::testing::kLinkJump}});
   }
 
   // NOLINTNEXTLINE(readability-redundant-access-specifiers): the slots above are public too

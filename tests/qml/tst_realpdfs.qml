@@ -111,6 +111,52 @@ Item {
             fuzzyCompare(win.viewer.zoom, before.zoom, 0.0001)
         }
 
+        // The search targets on real course documents: the first match in view within 200 ms, the full count soon after.
+        // The words are common ones for lecture notes; SHEAF_TEST_WORDS="word one,word two" picks others.
+        function test_search_meets_its_targets_on_real_documents() {
+            if (realPdfs.length < 1)
+                skip("no real PDFs given")
+            for (const group of tabs.groups())
+                tabs.deleteGroup(group.id)
+            tryVerify(() => !win.viewer.hasDocument, 5000)
+            for (let d = 0; d < realPdfs.length; ++d) {
+                waitForSwitch(() => tabs.openFile(realPdfs[d]))
+                wait(600)
+                win.viewer.jumpTo({ page: 0, offsetY: 0, zoom: win.viewer.zoom })
+                wait(400)
+                for (const word of ["the", "of the", "Gaussian"]) {
+                    win.viewer.closeSearch()
+                    win.viewer.openSearch()
+                    win.viewer.searchQuery = word
+                    const search = win.viewer.pane.search
+                    const timer = Date.now()
+                    win.viewer.runSearch(true)
+                    let firstMatch = -1
+                    let complete = -1
+                    for (let i = 0; i < 4000 && complete < 0; ++i) {
+                        wait(2)
+                        const now = Date.now() - timer
+                        if (firstMatch < 0 && search.currentPage >= 0 && win.viewer.pane.view.searchResultInView())
+                            firstMatch = now
+                        if (search.complete)
+                            complete = now
+                    }
+                    console.log("REAL SEARCH", realPdfs[d].toString().slice(-28), "pages", win.viewer.pageCount, "'" + word + "':",
+                                search.count, "matches; first in view after", firstMatch, "ms; complete after", complete, "ms")
+                    if (search.count > 0)
+                        verify(firstMatch >= 0 && firstMatch < 200, "first match of '" + word + "' took " + firstMatch + " ms")
+                    verify(complete >= 0 && complete < 2500, "'" + word + "' took " + complete + " ms to count")
+                    // A second search of the same text is served from memory.
+                    win.viewer.runSearch(false)
+                    const again = Date.now()
+                    for (let i = 0; i < 2000 && !search.complete; ++i)
+                        wait(2)
+                    verify(Date.now() - again < 1500)
+                }
+                win.viewer.closeSearch()
+            }
+        }
+
         function test_switching_between_real_documents() {
             if (realPdfs.length < 2)
                 skip("no real PDFs given")

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Pdf
+import SheafBackend 1.0
 
 // One PDF document in a continuous-scroll view with zoom. Wraps Qt PDF's PdfMultiPageView.
 // Single use: Viewer creates a fresh pane per opened document, because reusing a PdfDocument/PdfMultiPageView for
@@ -43,6 +44,12 @@ Item {
     property bool ready: false
     // Set by Viewer when this pane is the one on screen.
     property bool shown: false
+    // Set when another document is about to replace this one: it must not report anything any more.
+    property bool frozen: false
+    // The text search of this document (see PdfSearchSession).
+    readonly property alias search: search
+    // The search of the tab to bring back when this pane has been built, {open, query, page, start}, or null.
+    property var pendingSearch: null
     opacity: shown ? 1 : 0
     z: shown ? 1 : 0
     property var pendingRestore: null
@@ -62,8 +69,9 @@ Item {
     }
 
     // Loads `url`, restoring `position` ({valid, page, offsetY, zoom}) or fitting the width if it is not valid.
-    function open(url, position) {
+    function open(url, position, searchState) {
         pendingRestore = position
+        pendingSearch = searchState
         document.source = url
     }
 
@@ -91,9 +99,63 @@ Item {
 
     // Stops reporting position changes; used when another document is about to replace this one.
     function freeze() {
+        frozen = true
         settled = false
         moveTimer.stop()
     }
+
+    // --- Search ---
+
+    // Searches for `query`, continuing from the current match if there is one, else from the page being read. `reveal`
+    // scrolls to the first match found.
+    function startSearch(query, reveal) {
+        const current = search.currentPage >= 0
+        search.start(query, current ? search.currentPage : topPosition().page, current ? search.currentStart : 0, reveal)
+    }
+
+    // Brings a tab's earlier search back (highlights and current match) without scrolling anywhere.
+    function restoreSearch(state) {
+        if (!state || !state.query)
+            return
+        const known = state.page >= 0
+        search.start(state.query, known ? state.page : topPosition().page, known ? state.start : 0, false)
+    }
+
+    function clearSearch() {
+        search.clear()
+    }
+
+    // Scrolls the current match into view: in one move to the position worked out from the page sizes, which is right
+    // for most documents. If the match is not in view a few frames later (pages of different sizes can throw that
+    // calculation off until the table has laid out the pages in between), the table's own positioning takes over.
+    function revealSearchResult() {
+        if (!view)
+            return
+        view.revealCurrentSearchResult()
+        revealCheckTimer.ticks = 0
+        revealCheckTimer.restart()
+    }
+
+    Timer {
+        id: revealCheckTimer
+        interval: 16
+        property int ticks: 0
+        onTriggered: {
+            if (!root.view || root.view.searchResultInView() || ++ticks > 80)
+                return
+            // From the fourth frame on, ask the table every few frames (asking every frame would only restart its layout).
+            if (ticks >= 4 && ticks % 5 === 0)
+                root.view.revealCurrentSearchResultByCell()
+            restart()
+        }
+    }
+
+    PdfSearchSession {
+        id: search
+        source: root.document.source
+        onRevealRequested: root.revealSearchResult()
+    }
+
 
     function applyPending() {
         if (!hasDocument || !view)
@@ -108,6 +170,9 @@ Item {
             fitWidth()
         }
         settleTimer.restart()
+        // The search of the tab (highlights and current match) comes back with the document, without scrolling.
+        restoreSearch(pendingSearch)
+        pendingSearch = null
         readyTimer.ticks = 0
         readyTimer.restart()
     }
@@ -276,6 +341,7 @@ Item {
         active: root.hasDocument && root.width > 0 && root.height > 0
         sourceComponent: SheafPdfView {
             document: root.document
+            search: root.search
             onLinkTapped: (page, location, zoom) => root.followLink(page, location, zoom)
             onExternalLinkTapped: url => root.externalLinkRequested(url)
         }

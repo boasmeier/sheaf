@@ -89,7 +89,8 @@ void TabController::Restore() {
                                                   .file_key = tab.file_key,
                                                   .title = QFileInfo(tab.path).completeBaseName(),
                                                   .history = {},
-                                                  .missing = !QFileInfo::exists(tab.path)});
+                                                  .missing = !QFileInfo::exists(tab.path),
+                                                  .search = {}});
       if (g == record.active_tab_group && t == record.active_tab) {
         active_tab_id = tab_id;
       }
@@ -131,6 +132,19 @@ bool TabController::activeTabMissing() const {
   return tab != nullptr && tab->missing;
 }
 
+QVariantMap TabController::activeSearch() const {
+  const Tab* tab = model_.FindTab(model_.ActiveTabId());
+  const SearchState state = tab == nullptr ? SearchState{} : tab->search;
+  return {{"open", state.open}, {"query", state.query}, {"page", state.page}, {"start", state.start}};
+}
+
+void TabController::setSearchState(bool open, const QString& query, int page, int start) {
+  Tab* tab = model_.FindTab(model_.ActiveTabId());
+  if (tab != nullptr) {
+    tab->search = {.open = open, .query = query, .page = page, .start = start};
+  }
+}
+
 QString TabController::activePath() const {
   const Tab* tab = model_.FindTab(model_.ActiveTabId());
   return tab == nullptr ? QString() : tab->path;
@@ -167,8 +181,13 @@ bool TabController::openFile(const QUrl& url) {
       group_id = model_.GroupCount() > 0 ? model_.GroupIdAt(0) : model_.AddGroup(tr("Ungrouped"));
       SetActiveGroup(group_id);
     }
-    tab_id = model_.AddTab(
-        group_id, {.id = 0, .path = path, .file_key = key, .title = QFileInfo(path).completeBaseName(), .history = {}});
+    tab_id = model_.AddTab(group_id, {.id = 0,
+                                      .path = path,
+                                      .file_key = key,
+                                      .title = QFileInfo(path).completeBaseName(),
+                                      .history = {},
+                                      .missing = false,
+                                      .search = {}});
   }
   activate(tab_id);
   return true;

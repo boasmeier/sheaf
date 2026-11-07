@@ -16,6 +16,9 @@ Open a PDF with Ctrl+O, or pass it on the command line: `./build/sheaf file.pdf`
 | Ctrl+wheel, Ctrl++, Ctrl+- | Zoom |
 | Ctrl+0 | Fit width |
 | Ctrl+G | Go to page |
+| Ctrl+F | Find in the document (focuses the bar, selecting the last query) |
+| Enter / F3, Shift+Enter / Shift+F3 | Next / previous match |
+| Esc | Close the search bar and clear the highlights |
 | Alt+Left / Alt+Right, mouse Back / Forward | Back / forward through followed links (per tab) |
 | Ctrl+Tab / Ctrl+Shift+Tab | Next / previous tab (all groups, in sidebar order) |
 | Ctrl+W | Close tab |
@@ -31,6 +34,19 @@ collapse it; double-click a group to rename it; right-click for a menu (rename, 
 group); drag tabs and groups to reorder them. With the sidebar focused: Up/Down move the cursor, Return/Space show a
 tab or fold a group, Left/Right fold and unfold, F2 renames, Delete closes a tab or deletes a group. Deleting a group
 closes its tabs (after asking); the position in each document is remembered.
+
+## Search
+
+Ctrl+F opens a search bar over the document. All matches are highlighted, the current one is framed, and the counter
+reads "3 of 17". It is case-insensitive, a phrase matches across line breaks, and ligatures (ﬁ, ﬂ) do not get in the
+way. A search starts from the page you are reading; the first match is in view within milliseconds, and the whole
+document is counted in about a second (measured: 8354 matches over 427 pages in 0.8 s). Typing is debounced
+(150 ms). Each tab keeps its own query and current match when you switch away and back. A scanned document without a
+text layer says "No text in this document".
+
+Qt's own `PdfSearchModel` is not used: it needs 20+ seconds for 400 pages and cannot report that it has finished.
+`PdfSearchSession` reads the page texts with PDFium on a worker thread instead and works out the highlight rectangles
+only for pages that are shown.
 
 ## Session
 
@@ -55,6 +71,9 @@ ctest --test-dir build --output-on-failure
   (`tst_restore.qml`), the real window with the real tab controller (`tst_tabswitch.qml`) and link navigation
   with back/forward history (`tst_navigation.qml`), the sidebar and group shortcuts (`tst_sidebar.qml`,
   `tst_shortcuts.qml`), and quitting and restarting with missing files and window state (`tst_session.qml`).
+- - `tst_textmatcher`, `tst_searchresults`, `tst_pdfsearchsession`: the search (matching, results and navigation, and the
+  worker with generated PDFs, including speed targets); `tst_search.qml` drives it through the window (shortcuts, counter,
+  highlights as pixels, per-tab state).
 - `tst_quit` starts the real application headless and ends it with SIGTERM, SIGINT and SIGHUP like a logout does, then
   starts it again and checks the session.
 - `tst_realpdfs.qml` repeats the tab-switch scenario on your own PDFs and is skipped unless you name them:

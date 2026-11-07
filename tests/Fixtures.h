@@ -4,6 +4,7 @@
 #include <QColor>
 #include <QFile>
 #include <QFont>
+#include <QImage>
 #include <QPageSize>
 #include <QPainter>
 #include <QPdfWriter>
@@ -107,6 +108,87 @@ inline bool WritePdfWithLinks(const QString& path, int pages) {
 
   QFile file(path);
   return file.open(QIODevice::WriteOnly) && file.write(pdf) == pdf.size();
+}
+
+// ---- Text search fixtures ----
+
+// What WritePdfWithText() puts on its pages, so tests know what a search must find.
+inline constexpr int kSearchPages = 320;
+inline constexpr int kCommonWordsPerPage = 3;  // "common" appears this often on every page
+// "needle" is on every page whose 1-based number ends in 3 ...
+inline bool PageHasNeedle(int page_index) {
+  return (page_index + 1) % 10 == 3;
+}
+// ... and as "NEEDLE" (capitals) on page 5.
+inline constexpr int kShoutedNeedlePage = 4;  // 0-based
+// "red fox" is split across a line break on page 7 (0-based 6).
+inline constexpr int kRedFoxPage = 6;
+
+inline int ExpectedNeedleCount() {
+  int count = 1;  // the shouted one
+  for (int page = 0; page < kSearchPages; ++page) {
+    if (PageHasNeedle(page)) {
+      ++count;
+    }
+  }
+  return count;
+}
+
+// A text-heavy A4 document of `pages` pages: filler text, the word "common" three times per page, "needle" as described
+// above and a phrase spanning two lines. Real text, so it can be searched and selected.
+inline bool WritePdfWithText(const QString& path, int pages) {
+  QPdfWriter writer(path);
+  writer.setResolution(72);
+  writer.setPageSize(QPageSize(QPageSize::A4));
+  QPainter painter(&writer);
+  if (!painter.isActive()) {
+    return false;
+  }
+  QFont font("sans-serif");
+  font.setPixelSize(11);
+  painter.setFont(font);
+  for (int page = 0; page < pages; ++page) {
+    if (page > 0) {
+      writer.newPage();
+    }
+    QString text = QString("Chapter %1\n\n").arg(page + 1);
+    for (int line = 0; line < 9; ++line) {
+      text += "lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore\n";
+    }
+    text += "The common value, a common error and the common case.\n";
+    if (PageHasNeedle(page)) {
+      text += "Here is the needle you were looking for.\n";
+    }
+    if (page == kShoutedNeedlePage) {
+      text += "A NEEDLE in capitals.\n";
+    }
+    if (page == kRedFoxPage) {
+      text += "The quick red\nfox jumps over the lazy dog.\n";
+    }
+    const QRect area(40, 40, writer.width() - 80, writer.height() - 80);
+    painter.drawText(area, Qt::AlignTop | Qt::AlignLeft, text);
+  }
+  return painter.end();
+}
+
+// A document like a scan: every page is only a picture, so there is no text layer to search.
+inline bool WriteScannedPdf(const QString& path, int pages) {
+  QPdfWriter writer(path);
+  writer.setResolution(72);
+  writer.setPageSize(QPageSize(QPageSize::A5));
+  QPainter painter(&writer);
+  if (!painter.isActive()) {
+    return false;
+  }
+  QImage picture(300, 400, QImage::Format_RGB32);
+  for (int page = 0; page < pages; ++page) {
+    if (page > 0) {
+      writer.newPage();
+    }
+    picture.fill(QColor(200 - (page * 10), 220, 240));
+    painter.drawImage(QRect(0, 0, writer.width(), writer.height()), picture);
+  }
+  return painter.end();
 }
 
 }  // namespace sheaf::testing

@@ -1,3 +1,4 @@
+#include "app/QmlTypes.h"
 #include "app/TabController.h"
 #include "app/UnixSignals.h"
 #include "storage/Database.h"
@@ -29,6 +30,7 @@ int main(int argc, char* argv[]) {
   parser.process(app);
 
   sheaf::InstallQuitSignalHandlers();
+  sheaf::RegisterQmlTypes();
 
   sheaf::PositionStore positions(database);
   sheaf::SessionStore session(database);

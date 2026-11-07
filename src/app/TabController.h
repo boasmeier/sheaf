@@ -24,6 +24,8 @@ class TabController : public QObject {
   Q_PROPERTY(int activeGroupId READ activeGroupId NOTIFY activeGroupChanged)
   Q_PROPERTY(QUrl activeUrl READ activeUrl NOTIFY activeTabChanged)
   Q_PROPERTY(QString activeTitle READ activeTitle NOTIFY activeTabChanged)
+  // {open, query, page, start}: the active tab's search; the UI restores it when the tab is shown again.
+  Q_PROPERTY(QVariantMap activeSearch READ activeSearch NOTIFY activeTabChanged)
   // The active tab's file is not where it was last time; the UI offers to locate it or remove the tab.
   Q_PROPERTY(bool activeTabMissing READ activeTabMissing NOTIFY activeTabChanged)
   Q_PROPERTY(QString activePath READ activePath NOTIFY activeTabChanged)
@@ -49,6 +51,7 @@ public:
   QUrl activeUrl() const;
   QString activeTitle() const;
   bool activeTabMissing() const;
+  QVariantMap activeSearch() const;
   QString activePath() const;
   QVariantMap activePosition() const;
   bool canGoBack() const;
@@ -76,6 +79,10 @@ public:
   // Points a tab whose file moved at the file the user picked. Returns 0 when relinked, 1 if the file cannot be read,
   // 2 if it looks like a different file than before (not relinked unless `force`), 3 for an unknown tab.
   Q_INVOKABLE int locate(int tab_id, const QUrl& url, bool force = false);
+
+  // --- Search, per tab ---
+  // Remembers the active tab's search (bar open, query, current match) so that it survives switching tabs.
+  Q_INVOKABLE void setSearchState(bool open, const QString& query, int page, int start);
 
   // --- Small persistent settings (window size and the like) ---
   Q_INVOKABLE QVariant value(const QString& key, const QVariant& default_value = {}) const;

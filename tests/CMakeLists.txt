@@ -1,4 +1,4 @@
-foreach(name database fileidentity positionstore sessionstore navigationhistory sessionmodel tabcontroller)
+foreach(name database fileidentity positionstore sessionstore navigationhistory textmatcher searchresults sessionmodel tabcontroller)
   qt_add_executable(tst_${name} tst_${name}.cpp)
   target_link_libraries(tst_${name} PRIVATE sheaf_core Qt6::Test)
   sheaf_set_warnings(tst_${name})
@@ -25,3 +25,10 @@ add_dependencies(tst_quit sheaf)
 sheaf_set_warnings(tst_quit)
 add_test(NAME tst_quit COMMAND tst_quit)
 set_tests_properties(tst_quit PROPERTIES TIMEOUT 180 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Searching real PDFs generated on the fly (needs fonts, so a QGuiApplication; headless is enough).
+qt_add_executable(tst_pdfsearchsession tst_pdfsearchsession.cpp)
+target_link_libraries(tst_pdfsearchsession PRIVATE sheaf_core Qt6::Test Qt6::Gui)
+sheaf_set_warnings(tst_pdfsearchsession)
+add_test(NAME tst_pdfsearchsession COMMAND tst_pdfsearchsession)
+set_tests_properties(tst_pdfsearchsession PROPERTIES TIMEOUT 180 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

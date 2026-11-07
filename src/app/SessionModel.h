@@ -8,6 +8,15 @@
 
 namespace sheaf {
 
+// The search of one tab: whether its search bar is open, what was searched for and which match was the current one
+// (page and offset of the match in the page's text). In memory only, like the navigation history.
+struct SearchState {
+  bool open = false;
+  QString query;
+  int page = -1;
+  int start = 0;
+};
+
 // A tab is just a path, a file key and a title until it is first activated; its document is loaded lazily.
 struct Tab {
   int id = 0;
@@ -16,6 +25,7 @@ struct Tab {
   QString title;
   NavigationHistory history;  // in memory only
   bool missing = false;       // the file is not at `path` (any more)
+  SearchState search;
 };
 
 struct Group {

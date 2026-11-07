@@ -11,7 +11,13 @@ using sheaf::Row;
 using sheaf::RowKind;
 
 sheaf::Tab MakeTab(const QString& name) {
-  return {.id = 0, .path = "/" + name + ".pdf", .file_key = name, .title = name, .history = {}};
+  return {.id = 0,
+          .path = "/" + name + ".pdf",
+          .file_key = name,
+          .title = name,
+          .history = {},
+          .missing = false,
+          .search = {}};
 }
 
 QStringList Titles(const sheaf::SessionModel& model) {

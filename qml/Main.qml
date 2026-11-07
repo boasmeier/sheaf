@@ -26,7 +26,7 @@ ApplicationWindow {
         if (tabs.activeTabId < 0 || tabs.activeTabMissing)
             viewer.close()
         else
-            viewer.open(tabs.activeUrl, tabs.activePosition)
+            viewer.open(tabs.activeUrl, tabs.activePosition, tabs.activeSearch)
     }
 
     // Back / forward through the links followed in the active tab; the history lives in the TabController per tab.
@@ -199,6 +199,9 @@ ApplicationWindow {
     }
 
     Shortcut { sequences: [StandardKey.Open]; onActivated: openDialog.open() }
+    Shortcut { sequences: ["Ctrl+F"]; onActivated: viewer.openSearch() }
+    Shortcut { sequences: ["F3"]; onActivated: viewer.searchStep(true) }
+    Shortcut { sequences: ["Shift+F3"]; onActivated: viewer.searchStep(false) }
     Shortcut { sequences: [StandardKey.Back]; onActivated: window.navigateBack() }
     Shortcut { sequences: [StandardKey.Forward]; onActivated: window.navigateForward() }
     Shortcut { sequences: [StandardKey.Close]; onActivated: tabs.closeTab(tabs.activeTabId) }
@@ -309,7 +312,12 @@ ApplicationWindow {
                 onBackRequested: window.navigateBack()
                 onForwardRequested: window.navigateForward()
 
-                onViewMoved: {
+                onSearchStateChanged: {
+                const state = searchState()
+                tabs.setSearchState(state.open, state.query, state.page, state.start)
+            }
+
+            onViewMoved: {
                     const top = topPosition()
                     tabs.reportPosition(top.page, top.offset, zoom)
                 }

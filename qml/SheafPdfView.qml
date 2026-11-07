@@ -4,7 +4,8 @@
 // Modified copy of Qt's PdfMultiPageView (QtQuick/Pdf/PdfMultiPageView.qml, Qt 6.10), which Qt documents as
 // copyable and adaptable. The only changes are marked "SHEAF": tapping a link emits linkTapped() or
 // externalLinkTapped() instead of jumping or opening the browser, so the app can record its own per-tab history
-// (the built-in history does not see wheel scrolling) and ask before opening external links.
+// (the built-in history does not see wheel scrolling) and ask before opening external links; and text search is done
+// by the app's own PdfSearchSession (much faster than Qt's PdfSearchModel), which this view draws and scrolls to.
 
 pragma ComponentBehavior: Bound
 
@@ -259,44 +260,85 @@ Item {
     // --------------------------------
     // text search
 
-    /*!
-        \qmlproperty PdfSearchModel PdfMultiPageView::searchModel
+    // SHEAF: searching is done by our own PdfSearchSession, not Qt's PdfSearchModel, which needs many seconds for a few
+    // hundred pages and cannot tell when it is done. This view only draws what the session found and scrolls to it.
+    property var search: null
 
-        This property holds a PdfSearchModel containing the list of search results
-        for a given \l searchString.
-
-        \sa PdfSearchModel
-    */
-    property alias searchModel: searchModel
-
-    /*!
-        \qmlproperty string PdfMultiPageView::searchString
-
-        This property holds the search string that the user may choose to search
-        for. It is typically used in a binding to the \c text property of a
-        TextField.
-
-        \sa searchModel
-    */
-    property alias searchString: searchModel.searchString
+    // The y of the top of `page` in the table's content, worked out from the page sizes. The table only knows the
+    // position of pages it has laid out and estimates the rest, which makes its own positionViewAt...() approach a far
+    // page in several steps.
+    function pageTop(page) {
+        let y = tableView.originY
+        for (let i = 0; i < page; ++i)
+            y += tableView.rowHeightProvider(i) + tableView.rowSpacing
+        return y
+    }
 
     /*!
-        \qmlmethod void PdfMultiPageView::searchBack()
+        \qmlmethod bool revealCurrentSearchResult()
 
-        Decrements the
-        \l{PdfSearchModel::currentResult}{searchModel's current result}
-        so that the view will jump to the previous search result.
+        Scrolls the view just far enough to show the current match with some room around it, in one move; does nothing
+        if it is already in view. Returns whether the match is in view afterwards.
     */
-    function searchBack() { --searchModel.currentResult }
+    function revealCurrentSearchResult() {
+        if (!search || search.currentPage < 0)
+            return true
+        const rect = search.currentRect
+        const scale = root.renderScale
+        const margin = Qt.point(40, 70)
+        const top = pageTop(search.currentPage) + rect.y * scale
+        const bottom = top + rect.height * scale
+        let y = tableView.contentY
+        if (top - margin.y < y)
+            y = top - margin.y
+        else if (bottom + margin.y > y + tableView.height)
+            y = bottom + margin.y - tableView.height
+        const lastTop = pageTop(root.document.pageCount) - tableView.rowSpacing - tableView.height
+        tableView.cancelFlick()
+        tableView.contentY = Math.max(tableView.originY, Math.min(y, Math.max(tableView.originY, lastTop)))
+
+        // Sideways too, when the page is wider than the view (zoomed in): the page is centred in its column.
+        const columnWidth = tableView.columnWidthProvider(0)
+        const pageLeft = (columnWidth - root.document.pagePointSize(search.currentPage).width * scale) / 2
+        const left = pageLeft + rect.x * scale
+        const right = left + rect.width * scale
+        let x = tableView.contentX
+        if (left - margin.x < x)
+            x = left - margin.x
+        else if (right + margin.x > x + tableView.width)
+            x = right + margin.x - tableView.width
+        tableView.contentX = Math.max(0, Math.min(x, Math.max(0, tableView.contentWidth - tableView.width)))
+        return true
+    }
 
     /*!
-        \qmlmethod void PdfMultiPageView::searchForward()
+        \qmlmethod void revealCurrentSearchResultByCell()
 
-        Increments the
-        \l{PdfSearchModel::currentResult}{searchModel's current result}
-        so that the view will jump to the next search result.
+        The slower way to the same end, through the table's own positioning. It copes with documents whose pages have
+        different sizes, where a position computed from the page sizes can land on the wrong page until the table has
+        laid out the pages in between; it may take several calls to get there.
     */
-    function searchForward() { ++searchModel.currentResult }
+    function revealCurrentSearchResultByCell() {
+        if (!search || search.currentPage < 0)
+            return
+        const rect = search.currentRect
+        const margin = Qt.point(40, 70)
+        const rectPx = Qt.rect(rect.x * root.renderScale - margin.x, rect.y * root.renderScale - margin.y,
+                               rect.width * root.renderScale + margin.x * 2, rect.height * root.renderScale + margin.y * 2)
+        tableView.positionViewAtCell(0, search.currentPage, TableView.Contain, Qt.point(0, 0), rectPx)
+    }
+
+    // Is the current match inside the viewport (vertically)?
+    function searchResultInView() {
+        if (!search || search.currentPage < 0)
+            return true
+        const holder = tableView.itemAtCell(0, search.currentPage)
+        if (!holder)
+            return false
+        const top = holder.y + search.currentRect.y * root.renderScale - tableView.contentY
+        const bottom = top + search.currentRect.height * root.renderScale
+        return top >= 0 && bottom <= tableView.height
+    }
 
     LoggingCategory {
         id: lcMPV
@@ -396,15 +438,18 @@ Item {
                             id: searchHighlights
                             function update() {
                                 // paths could be a binding, but we need to be able to "kick" it sometimes
-                                paths = searchModel.boundingPolygonsOnPage(pageHolder.index)
+                                paths = root.search ? root.search.boundingPolygonsOnPage(pageHolder.index) : []
                             }
                         }
                     }
                     Connections {
-                        target: searchModel
-                        // whenever the highlights on the _current_ page change, they actually need to change on _all_ pages
-                        // (usually because the search string has changed)
-                        function onCurrentPageBoundingPolygonsChanged() { searchHighlights.update() }
+                        target: root.search
+                        // SHEAF: redraw when results arrive for this page, or when the search was reset
+                        function onPageHighlightsChanged(page) {
+                            if (page === pageHolder.index)
+                                searchHighlights.update()
+                        }
+                        function onHighlightsReset() { searchHighlights.update() }
                     }
                     ShapePath {
                         strokeWidth: -1
@@ -417,14 +462,14 @@ Item {
                 }
                 Shape {
                     anchors.fill: parent
-                    visible: image.status === Image.Ready && searchModel.currentPage === pageHolder.index
+                    visible: image.status === Image.Ready && root.search !== null && root.search.currentPage === pageHolder.index
                     ShapePath {
                         strokeWidth: style.currentSearchResultStrokeWidth
                         strokeColor: style.currentSearchResultStrokeColor
                         fillColor: "transparent"
                         scale: Qt.size(paper.pageScale, paper.pageScale)
                         PathMultiline {
-                            paths: searchModel.currentResultBoundingPolygons
+                            paths: root.search ? root.search.currentBounds : []
                         }
                     }
                 }
@@ -625,10 +670,5 @@ Item {
             tableView.contentX = 0
             tableView.contentY = 0
         }
-    }
-    PdfSearchModel {
-        id: searchModel
-        document: root.document === undefined ? null : root.document
-        onCurrentResultChanged: pageNavigator.jump(currentResultLink)
     }
 }
