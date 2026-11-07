@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Boas Meier
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "app/QmlTypes.h"
 
 #include "search/PdfSearchSession.h"

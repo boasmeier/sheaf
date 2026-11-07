@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Boas Meier
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Runs the QML tests in tests/qml against the real QML sources (qml/) with generated fixture PDFs and a real
 // TabController, so they exercise the same code paths as the app.
 #include "Fixtures.h"

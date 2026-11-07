@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Boas Meier
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Starts the real application (headless) and ends it the ways a desktop does: SIGTERM at logout or shutdown, SIGINT,
 // SIGHUP. The session must be on disk afterwards and come back at the next start.
 #include "Fixtures.h"

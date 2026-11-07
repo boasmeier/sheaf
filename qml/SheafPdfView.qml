@@ -1,5 +1,6 @@
 // Copyright (C) 2022 The Qt Company Ltd.
 // SPDX-License-Identifier: LicenseRef-Qt-Commercial OR LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only
+// Modifications: Copyright (C) 2026 Boas Meier
 
 // Modified copy of Qt's PdfMultiPageView (QtQuick/Pdf/PdfMultiPageView.qml, Qt 6.10), which Qt documents as
 // copyable and adaptable. The only changes are marked "SHEAF": tapping a link emits linkTapped() or

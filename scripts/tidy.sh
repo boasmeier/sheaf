@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright (C) 2026 Boas Meier
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Run clang-tidy on all project sources. Usage: [TIDY_JOBS=n] scripts/tidy.sh [build-dir]
 # TIDY_JOBS limits the parallel clang-tidy processes (default: all cores); each one needs a few hundred MB.
 # CMake's compile database contains GCC-only module-scanning flags that clang-tidy rejects,

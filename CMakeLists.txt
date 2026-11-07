@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Boas Meier
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 cmake_minimum_required(VERSION 3.21)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 project(sheaf VERSION 0.1.0 LANGUAGES CXX)

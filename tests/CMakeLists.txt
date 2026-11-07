@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Boas Meier
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 foreach(name database fileidentity positionstore sessionstore navigationhistory textmatcher searchresults sessionmodel tabcontroller)
   qt_add_executable(tst_${name} tst_${name}.cpp)
   target_link_libraries(tst_${name} PRIVATE sheaf_core Qt6::Test)

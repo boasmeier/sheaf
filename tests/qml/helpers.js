@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Boas Meier
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 .pragma library
 
 // A cheap fingerprint of an image: sampled pixels hashed together. Equal renders give equal fingerprints.

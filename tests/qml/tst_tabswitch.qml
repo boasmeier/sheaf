@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Boas Meier
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import QtQuick
 import QtTest
 import "helpers.js" as Helpers
