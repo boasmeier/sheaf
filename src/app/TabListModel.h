@@ -1,5 +1,7 @@
 #pragma once
 
+#include "app/NavigationHistory.h"
+
 #include <QAbstractListModel>
 #include <QString>
 #include <QVector>
@@ -11,6 +13,7 @@ struct Tab {
   QString path;
   QString file_key;
   QString title;
+  NavigationHistory history;  // in memory only
 };
 
 // Flat list of tabs for QML (M4 replaces this with the group/tab tree).
@@ -30,6 +33,7 @@ public:
 
   int Count() const;
   const Tab& At(int index) const;
+  NavigationHistory& HistoryAt(int index);
   int IndexOfKey(const QString& file_key) const;
   void Append(Tab tab);
   void RemoveAt(int index);

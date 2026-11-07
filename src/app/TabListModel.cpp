@@ -39,6 +39,10 @@ const Tab& TabListModel::At(int index) const {
   return tabs_.at(index);
 }
 
+NavigationHistory& TabListModel::HistoryAt(int index) {
+  return tabs_[index].history;
+}
+
 int TabListModel::IndexOfKey(const QString& file_key) const {
   for (int i = 0; i < tabs_.size(); ++i) {
     if (tabs_.at(i).file_key == file_key) {

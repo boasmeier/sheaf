@@ -128,6 +128,53 @@ private slots:
     QCOMPARE(tabs.activeTitle(), QString("b"));
   }
 
+  void EachTabKeepsItsOwnHistory() {
+    const QTemporaryDir dir;
+    sheaf::TabController tabs(*store_, kDelayMs);
+    QVERIFY(tabs.openFile(Url(MakeFile(dir, "a.pdf", 'a'))));
+    QVERIFY(tabs.openFile(Url(MakeFile(dir, "b.pdf", 'b'))));
+    const QSignalSpy history_changed(&tabs, &sheaf::TabController::historyChanged);
+
+    tabs.activate(0);
+    QVERIFY(!tabs.canGoBack());
+    tabs.recordJump(5, 0.5, 1);
+    tabs.recordJump(9, 0.1, 1);
+    QVERIFY(tabs.canGoBack());
+    QVERIFY(!tabs.canGoForward());
+
+    tabs.activate(1);  // the other tab has no history
+    QVERIFY(!tabs.canGoBack());
+    QVERIFY(!tabs.goBack(3, 0, 1).value("valid").toBool());
+    tabs.recordJump(2, 0.2, 1);
+
+    tabs.activate(0);  // and tab 0 still has its own
+    QVERIFY(tabs.canGoBack());
+    QVariantMap back = tabs.goBack(30, 0.3, 2);
+    QVERIFY(back.value("valid").toBool());
+    QCOMPARE(back.value("page").toInt(), 9);
+    QCOMPARE(back.value("offsetY").toDouble(), 0.1);
+    back = tabs.goBack(9, 0.1, 1);
+    QCOMPARE(back.value("page").toInt(), 5);
+    QCOMPARE(back.value("offsetY").toDouble(), 0.5);
+    QVERIFY(!tabs.canGoBack());
+    QVERIFY(tabs.canGoForward());
+    const QVariantMap forward = tabs.goForward(5, 0.5, 1);
+    QCOMPARE(forward.value("page").toInt(), 9);
+    QVERIFY(history_changed.count() > 0);
+  }
+
+  void ClosingATabDropsItsHistory() {
+    const QTemporaryDir dir;
+    sheaf::TabController tabs(*store_, kDelayMs);
+    const QString path = MakeFile(dir, "a.pdf", 'a');
+    QVERIFY(tabs.openFile(Url(path)));
+    tabs.recordJump(5, 0, 1);
+    tabs.closeTab(0);
+    QVERIFY(!tabs.canGoBack());
+    QVERIFY(tabs.openFile(Url(path)));  // reopening starts with a clean history
+    QVERIFY(!tabs.canGoBack());
+  }
+
   void CycleWrapsAround() {
     const QTemporaryDir dir;
     sheaf::TabController tabs(*store_, kDelayMs);

@@ -8,6 +8,18 @@
 
 namespace sheaf {
 
+namespace {
+
+QVariantMap ToMap(const Position& position) {
+  return {{"valid", true}, {"page", position.page}, {"offsetY", position.offset_y}, {"zoom", position.zoom}};
+}
+
+QVariantMap NoPosition() {
+  return {{"valid", false}};
+}
+
+}  // namespace
+
 TabController::TabController(PositionStore& store, int save_delay_ms, QObject* parent)
     : QObject(parent), model_(this), store_(store) {
   save_timer_.setSingleShot(true);
@@ -46,7 +58,7 @@ bool TabController::openFile(const QUrl& url) {
   }
   int index = model_.IndexOfKey(key);
   if (index < 0) {
-    model_.Append({.path = path, .file_key = key, .title = QFileInfo(path).completeBaseName()});
+    model_.Append({.path = path, .file_key = key, .title = QFileInfo(path).completeBaseName(), .history = {}});
     index = model_.Count() - 1;
   }
   activate(index);
@@ -75,6 +87,7 @@ void TabController::closeTab(int index) {
   }
   else {
     emit activeTabChanged();
+    emit historyChanged();
   }
 }
 
@@ -85,12 +98,44 @@ void TabController::activate(int index) {
   Flush();
   active_index_ = index;
 
-  QVariantMap position{{"valid", false}};
-  if (const auto stored = store_.Load(model_.At(index).file_key)) {
-    position = {{"valid", true}, {"page", stored->page}, {"offsetY", stored->offset_y}, {"zoom", stored->zoom}};
-  }
-  active_position_ = position;
+  const auto stored = store_.Load(model_.At(index).file_key);
+  active_position_ = stored ? ToMap(*stored) : NoPosition();
   emit activeTabChanged();
+  emit historyChanged();
+}
+
+bool TabController::canGoBack() const {
+  return active_index_ >= 0 && model_.At(active_index_).history.CanGoBack();
+}
+
+bool TabController::canGoForward() const {
+  return active_index_ >= 0 && model_.At(active_index_).history.CanGoForward();
+}
+
+void TabController::recordJump(int page, double offset_y, double zoom) {
+  if (active_index_ < 0) {
+    return;
+  }
+  model_.HistoryAt(active_index_).RecordJump({.page = page, .offset_y = offset_y, .zoom = zoom});
+  emit historyChanged();
+}
+
+QVariantMap TabController::goBack(int page, double offset_y, double zoom) {
+  if (active_index_ < 0) {
+    return NoPosition();
+  }
+  const auto target = model_.HistoryAt(active_index_).GoBack({.page = page, .offset_y = offset_y, .zoom = zoom});
+  emit historyChanged();
+  return target ? ToMap(*target) : NoPosition();
+}
+
+QVariantMap TabController::goForward(int page, double offset_y, double zoom) {
+  if (active_index_ < 0) {
+    return NoPosition();
+  }
+  const auto target = model_.HistoryAt(active_index_).GoForward({.page = page, .offset_y = offset_y, .zoom = zoom});
+  emit historyChanged();
+  return target ? ToMap(*target) : NoPosition();
 }
 
 void TabController::cycle(int delta) {

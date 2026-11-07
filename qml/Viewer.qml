@@ -24,6 +24,13 @@ Item {
     signal viewMoved
     // Emitted when a newly opened document replaced the previous one on screen.
     signal switched
+    // An internal link is about to be followed from `from` ({page, offsetY, zoom}); record it for Back.
+    signal linkFollowed(var from)
+    // An external link was tapped; ask the user before opening it.
+    signal externalLinkRequested(url url)
+    // The mouse's Back / Forward buttons were pressed.
+    signal backRequested
+    signal forwardRequested
 
     property url pendingUrl
     property var pendingPosition: null
@@ -48,6 +55,11 @@ Item {
 
     function topPosition() {
         return pane ? pane.topPosition() : { page: 0, offset: 0 }
+    }
+
+    function jumpTo(position) {
+        if (pane)
+            pane.jumpTo(position)
     }
 
     function goToPage(page) {
@@ -83,6 +95,8 @@ Item {
         PdfPane {
             id: candidate
             onViewMoved: root.viewMoved()
+            onLinkFollowed: from => root.linkFollowed(from)
+            onExternalLinkRequested: url => root.externalLinkRequested(url)
             onReadyChanged: {
                 if (ready && root.loadingLoader.item === candidate)
                     root.showLoadedPane()
@@ -100,6 +114,16 @@ Item {
         id: slotB
         anchors.fill: parent
         onLoaded: item.open(root.pendingUrl, root.pendingPosition)
+    }
+
+    TapHandler {
+        acceptedButtons: Qt.BackButton
+        onTapped: root.backRequested()
+    }
+
+    TapHandler {
+        acceptedButtons: Qt.ForwardButton
+        onTapped: root.forwardRequested()
     }
 
     Label {

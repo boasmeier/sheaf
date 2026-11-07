@@ -9,11 +9,27 @@
 #include <QQmlContext>
 #include <QQmlEngine>
 #include <QTemporaryDir>
+#include <QTest>
 #include <QUrl>
 #include <QVariantMap>
+#include <QWindow>
 #include <QtQuickTest>
 
 #include <memory>
+
+// Lets QML tests send key presses to a window other than the test's own (e.g. the application window), so keyboard
+// shortcuts can be tested for real.
+class KeyInjector : public QObject {
+  Q_OBJECT
+
+public:
+  using QObject::QObject;
+
+  // NOLINTNEXTLINE(readability-identifier-naming): QML-facing API
+  Q_INVOKABLE void keyClick(QWindow* window, int key, int modifiers) const {
+    QTest::keyClick(window, static_cast<Qt::Key>(key), static_cast<Qt::KeyboardModifiers>(modifiers));
+  }
+};
 
 class Setup;
 namespace {
@@ -33,8 +49,9 @@ public slots:
     // Two documents of different length; beta has mixed page sizes.
     const QString alpha = dir_.filePath("alpha.pdf");
     const QString beta = dir_.filePath("beta.pdf");
+    const QString linked = dir_.filePath("linked.pdf");
     if (!sheaf::testing::WritePdfFixture(alpha, "ALPHA", 150, false) ||
-        !sheaf::testing::WritePdfFixture(beta, "BETA", 180, true)) {
+        !sheaf::testing::WritePdfFixture(beta, "BETA", 180, true) || !sheaf::testing::WritePdfWithLinks(linked, 60)) {
       qFatal("Cannot write fixture PDFs");
     }
     // QUICK_TEST_MAIN destroys the application object before this one, and the database needs it to close.
@@ -50,9 +67,13 @@ public slots:
     }
     engine->rootContext()->setContextProperty("realPdfs", real_pdfs);
 
+    engine->rootContext()->setContextProperty("keys", &keys_);
     engine->rootContext()->setContextProperty("tabs", tabs_.get());
-    engine->rootContext()->setContextProperty(
-        "fixtures", QVariantMap{{"alpha", QUrl::fromLocalFile(alpha)}, {"beta", QUrl::fromLocalFile(beta)}});
+    engine->rootContext()->setContextProperty("fixtures", QVariantMap{{"alpha", QUrl::fromLocalFile(alpha)},
+                                                                      {"beta", QUrl::fromLocalFile(beta)},
+                                                                      {"linked", QUrl::fromLocalFile(linked)},
+                                                                      {"externalUrl", sheaf::testing::kExternalLinkUrl},
+                                                                      {"linkJump", sheaf::testing::kLinkJump}});
   }
 
   // NOLINTNEXTLINE(readability-redundant-access-specifiers): the slots above are public too
@@ -64,6 +85,7 @@ public:
   }
 
 private:
+  KeyInjector keys_;
   QTemporaryDir dir_;
   sheaf::Database database_{"qmltests"};
   std::unique_ptr<sheaf::PositionStore> positions_;

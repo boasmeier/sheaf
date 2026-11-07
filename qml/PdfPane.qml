@@ -28,6 +28,10 @@ Item {
 
     // Emitted when scroll position or zoom changed after the document was shown and restored; use topPosition().
     signal viewMoved
+    // Emitted just before an internal link is followed, with the position being left ({page, offsetY, zoom}).
+    signal linkFollowed(var from)
+    // Emitted when an external link was tapped; the app asks the user before opening it.
+    signal externalLinkRequested(url url)
 
     // True once the requested position has been restored; changes before that are not the user's.
     property bool settled: false
@@ -46,6 +50,28 @@ Item {
         document.source = url
     }
 
+    // Scrolls to `position` ({page, offsetY, zoom}): the page, how far (0..1) it is scrolled, and the zoom.
+    function jumpTo(position) {
+        if (!hasDocument || !view)
+            return
+        const page = Math.max(0, Math.min(position.page, pageCount - 1))
+        const scale = Math.max(minZoom, Math.min(maxZoom, position.zoom))
+        const pageHeight = document.pagePointSize(page).height
+        // Apply the zoom and rebuild the row heights first, or the jump lands in the wrong place.
+        view.renderScale = scale
+        flickable().forceLayout()
+        // The view keeps a 10 px margin above the requested location.
+        view.goToLocation(page, Qt.point(0, position.offsetY * pageHeight + 10 / scale), scale)
+    }
+
+    // An internal link was tapped: remember where we were, then go there.
+    function followLink(page, location, zoom) {
+        const from = topPosition()
+        linkFollowed({ page: from.page, offsetY: from.offset, zoom: root.zoom })
+        // Keep the current zoom: Qt reports zoom 1 for links that do not set one, which would reset it on every jump.
+        view.goToLocation(page, location, 0)
+    }
+
     // Stops reporting position changes; used when another document is about to replace this one.
     function freeze() {
         settled = false
@@ -57,18 +83,10 @@ Item {
             return
         const position = pendingRestore
         pendingRestore = null
-        if (position && position.valid) {
-            const page = Math.max(0, Math.min(position.page, pageCount - 1))
-            const scale = Math.max(minZoom, Math.min(maxZoom, position.zoom))
-            const pageHeight = document.pagePointSize(page).height
-            // Apply the zoom and rebuild the row heights first, or the jump lands in the wrong place.
-            view.renderScale = scale
-            flickable().forceLayout()
-            // PdfMultiPageView keeps a 10 px margin above the requested location.
-            view.goToLocation(page, Qt.point(0, position.offsetY * pageHeight + 10 / scale), scale)
-        } else {
+        if (position && position.valid)
+            jumpTo(position)
+        else
             fitWidth()
-        }
         settleTimer.restart()
         readyTimer.ticks = 0
         readyTimer.restart()
@@ -206,8 +224,10 @@ Item {
         anchors.fill: parent
         // Also wait for a real size: a view created at 0x0 (app start, before the window is laid out) loses the jump.
         active: root.hasDocument && root.width > 0 && root.height > 0
-        sourceComponent: PdfMultiPageView {
+        sourceComponent: SheafPdfView {
             document: root.document
+            onLinkTapped: (page, location, zoom) => root.followLink(page, location, zoom)
+            onExternalLinkTapped: url => root.externalLinkRequested(url)
         }
         onLoaded: {
             // Connect explicitly: a Connections element would have to re-resolve the table inside the view.

@@ -1,4 +1,4 @@
-foreach(name database fileidentity positionstore tabcontroller)
+foreach(name database fileidentity positionstore navigationhistory tabcontroller)
   qt_add_executable(tst_${name} tst_${name}.cpp)
   target_link_libraries(tst_${name} PRIVATE sheaf_core Qt6::Test)
   sheaf_set_warnings(tst_${name})
