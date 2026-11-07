@@ -149,9 +149,63 @@ Build one milestone at a time. Each ends with a working app and a check by the d
 - Persist and restore groups, tabs, order, collapsed state, active tab, window geometry. Missing-file handling.
 - **Done when:** quitting (window close, Ctrl+Q, logout) and restarting restores the identical sidebar and active tab at the remembered position; a deleted file shows the "File not found" state.
 
-### M6: Polish (after v0.1 works)
+### M6: Search
 
-Search within document, text selection and copy, dark mode / inverted page colours, outline panel, settings dialog, open multiple files from the command line into a group.
+- Search bar per tab using Qt PDF's search model. Highlight all matches, jump between them, show a "3 of 17" counter. Search state (query, current match) is kept per tab.
+- **Shortcuts:** Ctrl+F opens the bar and focuses it (selecting the existing query); Enter or F3 next match; Shift+Enter or Shift+F3 previous match; Esc closes the bar and clears highlights.
+- **Done when:**
+  - on a 300+ page script, the first match is highlighted within 200 ms, and the full match count is ready within 2 s;
+  - results appear incrementally and the UI never blocks: scrolling stays smooth while a search runs;
+  - typing is debounced (about 150 ms), so each keystroke does not start a full new search;
+  - switching tabs keeps each tab's query and current match;
+  - a scanned PDF without a text layer shows "No text in this document" instead of silently finding nothing.
+
+### M7: Text selection and copy
+
+- Select text with the mouse, copy to the clipboard. Right-click menu with "Copy".
+- **Shortcuts:** mouse drag selects; double-click selects a word; Ctrl+C copies; Ctrl+A selects all text of the current page; Esc clears the selection.
+- **Done when:**
+  - the selection follows the mouse without visible lag;
+  - copying a full page's text takes under 100 ms;
+  - selection does not interfere with link clicks (a short click on a link still follows it);
+  - behaviour when dragging across a page boundary is tested and documented (supported, or clearly limited).
+
+### M8: Dark mode and inverted pages
+
+- The UI follows GNOME's light/dark style. Separately, an option to invert page colours for reading at night.
+- **Shortcuts:** Ctrl+Shift+I toggles inverted pages (global, remembered across restarts).
+- **Done when:**
+  - toggling takes effect within 100 ms on the visible pages;
+  - inverting is done as a display effect (shader), not by re-rendering, so it costs no extra RAM and no re-render;
+  - images in inverted mode are acceptable (test with a script containing photos and plots).
+
+### M9: Outline panel
+
+- Show the PDF's table of contents (bookmarks) as a collapsible tree, and highlight the current section while scrolling.
+- **Shortcuts:** F7 toggles the outline panel; Enter on an entry jumps to it.
+- **Done when:**
+  - the outline of a 300+ page script with 500+ entries opens within 100 ms;
+  - jumping via the outline pushes onto the back stack, so Alt+← returns to the previous position;
+  - PDFs without an outline show a clear "No outline" state.
+
+### M10: Settings dialog
+
+- Settings for: tab unload timeout, default zoom (fit width / fit page / last used), page cache size, inverted pages default, restore session on start (on/off).
+- **Shortcuts:** Ctrl+, opens the dialog; Esc closes it.
+- **Done when:**
+  - changes apply immediately without restarting and persist in the `settings` table;
+  - the dialog opens within 100 ms;
+  - invalid values are impossible (constrained inputs, sensible ranges).
+
+### M11: Open files from the command line into a group
+
+- `sheaf a.pdf b.pdf` opens files into the active group; `sheaf --group "Analysis" *.pdf` opens them into the named group, creating it if needed.
+- Single instance: if sheaf is already running, files are handed to the running window (via `QLocalServer`/`QLocalSocket`) instead of starting a second instance.
+- **Done when:**
+  - opening 20 files at once shows the window within 500 ms, with only the first file loaded (others lazy);
+  - handing files to a running instance takes under 200 ms and brings its window to the front;
+  - files that are already open are focused, not duplicated;
+  - non-existent or non-PDF paths produce a clear message and do not abort the other files.
 
 ## 5. Testing and performance
 
