@@ -16,3 +16,5 @@ Open a PDF with Ctrl+O, or pass it on the command line: `./build/sheaf file.pdf`
 | Ctrl+wheel, Ctrl++, Ctrl+- | Zoom |
 | Ctrl+0 | Fit width |
 | Ctrl+G | Go to page |
+| Ctrl+Tab / Ctrl+Shift+Tab | Next / previous tab |
+| Ctrl+W | Close tab |

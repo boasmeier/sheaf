@@ -8,7 +8,9 @@ Item {
 
     property alias source: document.source
     readonly property alias document: document
-    readonly property bool hasDocument: document.status === PdfDocument.Ready
+    // Set by close(); the last document stays in memory until the next open() but is hidden.
+    property bool closed: true
+    readonly property bool hasDocument: !closed && document.status === PdfDocument.Ready
     readonly property int pageCount: document.pageCount
     // Page at the centre of the viewport. PdfMultiPageView's own currentPage only updates when its scroll bar
     // is used, not while scrolling with the wheel, so track the visible page ourselves.
@@ -20,6 +22,63 @@ Item {
     readonly property real zoomStep: 1.25
     // Pixels scrolled per mouse wheel notch. Qt's default for flickables is far too small for page-sized content.
     property real wheelScrollPixels: 180
+
+    // Emitted when scroll position or zoom changed after the document was shown and restored; use topPosition().
+    signal viewChanged
+
+    // True once the requested position has been restored; changes before that are not the user's.
+    property bool settled: false
+    property var pendingRestore: null
+
+    // Shows `url`, restoring `position` ({valid, page, offsetY, zoom}) or fitting the width if it is not valid.
+    function open(url, position) {
+        closed = false
+        settled = false
+        pendingRestore = position
+        if (document.source == url)
+            Qt.callLater(applyPending)
+        else
+            document.source = url
+    }
+
+    function close() {
+        closed = true
+        settled = false
+        pendingRestore = null
+    }
+
+    function applyPending() {
+        if (!hasDocument)
+            return
+        const position = pendingRestore
+        pendingRestore = null
+        if (position && position.valid) {
+            const page = Math.max(0, Math.min(position.page, pageCount - 1))
+            const scale = Math.max(minZoom, Math.min(maxZoom, position.zoom))
+            const pageHeight = document.pagePointSize(page).height
+            // PdfMultiPageView keeps a 10 px margin above the requested location.
+            view.goToLocation(page, Qt.point(0, position.offsetY * pageHeight + 10 / scale), scale)
+        } else {
+            fitWidth()
+        }
+        settleTimer.restart()
+    }
+
+    // Page at the top of the viewport and how far (0..1) it is scrolled; this is what gets saved.
+    function topPosition() {
+        const flick = flickable()
+        if (!flick || !hasDocument)
+            return { page: currentPage, offset: 0 }
+        let row = flick.cellAtPos(view.width / 2, 1).y
+        if (row < 0)
+            row = flick.cellAtPos(view.width / 2, 8).y
+        if (row < 0)
+            row = currentPage
+        const item = flick.itemAtCell(0, row)
+        if (!item || item.height <= 0)
+            return { page: row, offset: 0 }
+        return { page: row, offset: Math.max(0, Math.min(1, (flick.contentY - item.y) / item.height)) }
+    }
 
     function goToPage(page) {
         // Not view.goToPage(): it ignores requests for the page its navigator last saw, which can be stale.
@@ -49,8 +108,8 @@ Item {
         id: document
         onStatusChanged: function (status) {
             if (status === PdfDocument.Ready)
-                // PdfMultiPageView resets its scale when the source changes, so fit afterwards.
-                Qt.callLater(root.fitWidth)
+                // PdfMultiPageView resets its scale when the source changes, so apply ours afterwards.
+                Qt.callLater(root.applyPending)
         }
     }
 
@@ -58,7 +117,17 @@ Item {
         target: root.flickable()
         function onContentYChanged() {
             Qt.callLater(root.updateCurrentPage)
+            if (root.settled)
+                root.viewChanged()
         }
+    }
+
+    onZoomChanged: if (settled) viewChanged()
+
+    Timer {
+        id: settleTimer
+        interval: 250
+        onTriggered: root.settled = true
     }
 
     PdfMultiPageView {

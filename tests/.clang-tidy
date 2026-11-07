@@ -1,0 +1,6 @@
+---
+# Tests: QVERIFY guards optional access and Position literals are clearer positional.
+InheritParentConfig: true
+Checks: >
+  -bugprone-unchecked-optional-access,
+  -modernize-use-designated-initializers

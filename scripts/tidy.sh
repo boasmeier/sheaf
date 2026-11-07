@@ -10,4 +10,4 @@ trap 'rm -rf "$filtered"' EXIT
 sed -E 's/ -fdeps-format=[^ ]+//g; s/ -fmodules-ts//g; s/ -fmodule-mapper=[^ ]+//g; s/ -MD -MT [^ ]+ -MF [^ ]+//g' \
   "$build/compile_commands.json" > "$filtered/compile_commands.json"
 cd "$root"
-find src tests -name '*.cpp' -print0 | xargs -0 clang-tidy -p "$filtered" --quiet
+find src tests -name '*.cpp' -print0 | xargs -0 -n 1 -P "$(nproc)" clang-tidy -p "$filtered" --quiet

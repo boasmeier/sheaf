@@ -26,6 +26,14 @@ endfunction()
 add_library(sheaf_core STATIC
   src/storage/Database.cpp
   src/storage/Database.h
+  src/storage/PositionStore.cpp
+  src/storage/PositionStore.h
+  src/util/FileIdentity.cpp
+  src/util/FileIdentity.h
+  src/app/TabListModel.cpp
+  src/app/TabListModel.h
+  src/app/TabController.cpp
+  src/app/TabController.h
 )
 target_include_directories(sheaf_core PUBLIC src)
 target_link_libraries(sheaf_core PUBLIC Qt6::Core Qt6::Sql)

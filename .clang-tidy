@@ -22,7 +22,11 @@ Checks: >
   -modernize-use-nodiscard,
   -readability-function-cognitive-complexity,
   -cppcoreguidelines-special-member-functions,
-  -cppcoreguidelines-pro-bounds-constant-array-index
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-avoid-const-or-ref-data-members,
+  -cppcoreguidelines-use-enum-class,
+  -performance-enum-size,
+  -bugprone-easily-swappable-parameters
 HeaderFilterRegex: '.*/sheaf/(src|tests)/.*'
 FormatStyle: file
 CheckOptions:
