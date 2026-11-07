@@ -23,6 +23,9 @@ Item {
     readonly property real minZoom: 0.1
     readonly property real maxZoom: 10
     readonly property real zoomStep: 1.25
+    // One mouse wheel notch zooms this many times less than a key press: the wheel is used in a stream of notches, so
+    // the keyboard's step would be far too coarse. A notch multiplies the zoom by zoomStep^(1/wheelZoomDivisor).
+    readonly property real wheelZoomDivisor: 5
     // Pixels scrolled per mouse wheel notch. Qt's default for flickables is far too small for page-sized content.
     property real wheelScrollPixels: 180
 
@@ -139,6 +142,12 @@ Item {
 
     function zoomIn() {
         setZoom(zoom * zoomStep)
+    }
+
+    // Zooms for a wheel turn of `angleDelta` (120 per notch; high-resolution wheels and touchpads send fractions of it,
+    // so the zoom follows the amount turned).
+    function zoomByWheel(angleDelta) {
+        setZoom(zoom * Math.pow(zoomStep, angleDelta / 120 / wheelZoomDivisor))
     }
 
     function zoomOut() {
@@ -321,12 +330,7 @@ Item {
         WheelHandler {
             acceptedModifiers: Qt.ControlModifier
             acceptedDevices: PointerDevice.AllDevices
-            onWheel: event => {
-                if (event.angleDelta.y > 0)
-                    root.zoomIn()
-                else if (event.angleDelta.y < 0)
-                    root.zoomOut()
-            }
+            onWheel: event => root.zoomByWheel(event.angleDelta.y)
         }
         WheelHandler {
             acceptedModifiers: Qt.NoModifier

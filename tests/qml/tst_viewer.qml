@@ -63,6 +63,30 @@ Item {
             fuzzyCompare(viewer.zoom, before, 0.001)
         }
 
+        function test_a_wheel_notch_zooms_five_times_finer_than_a_key_press() {
+            const before = viewer.zoom
+            const keyStep = viewer.pane.zoomStep  // what Ctrl++ and Ctrl+- do: unchanged
+            viewer.zoomIn()
+            fuzzyCompare(viewer.zoom, before * keyStep, 0.0001)
+            viewer.zoomOut()
+            fuzzyCompare(viewer.zoom, before, 0.0001)
+
+            mouseWheel(viewer, 300, 300, 0, 120, Qt.NoButton, Qt.ControlModifier)  // one notch in
+            const notch = Math.pow(keyStep, 1 / 5)
+            fuzzyCompare(viewer.zoom, before * notch, 0.0001)
+            verify(viewer.zoom < before * keyStep, "a notch must be finer than a key press")
+            // Five notches add up to one key press.
+            for (let i = 0; i < 4; ++i)
+                mouseWheel(viewer, 300, 300, 0, 120, Qt.NoButton, Qt.ControlModifier)
+            fuzzyCompare(viewer.zoom, before * keyStep, 0.001)
+            // The other way round, and in fractions: half a notch (a high-resolution wheel) zooms half as much.
+            for (let i = 0; i < 5; ++i)
+                mouseWheel(viewer, 300, 300, 0, -120, Qt.NoButton, Qt.ControlModifier)
+            fuzzyCompare(viewer.zoom, before, 0.001)
+            mouseWheel(viewer, 300, 300, 0, 60, Qt.NoButton, Qt.ControlModifier)
+            fuzzyCompare(viewer.zoom, before * Math.pow(keyStep, 0.5 / 5), 0.0001)
+        }
+
         function test_zoom_buttons_and_limits() {
             const before = viewer.zoom
             viewer.zoomIn()
