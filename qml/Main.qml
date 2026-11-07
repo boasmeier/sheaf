@@ -8,15 +8,17 @@ ApplicationWindow {
 
     // `tabs` (TabController) is provided by the C++ side.
     readonly property alias viewer: viewer
+    readonly property alias sidebar: sidebar
+    readonly property alias deleteGroupDialog: deleteGroupDialog
 
     visible: true
     width: 1100
     height: 750
-    title: tabs.activeIndex >= 0 ? qsTr("%1 – sheaf").arg(tabs.activeTitle) : "sheaf"
+    title: tabs.activeTabId >= 0 ? qsTr("%1 – sheaf").arg(tabs.activeTitle) : "sheaf"
 
     // Shows whichever tab is active; only that tab's document is loaded.
     function showActiveTab() {
-        if (tabs.activeIndex < 0)
+        if (tabs.activeTabId < 0)
             viewer.close()
         else
             viewer.open(tabs.activeUrl, tabs.activePosition)
@@ -88,9 +90,13 @@ ApplicationWindow {
     Shortcut { sequences: [StandardKey.Open]; onActivated: openDialog.open() }
     Shortcut { sequences: [StandardKey.Back]; onActivated: window.navigateBack() }
     Shortcut { sequences: [StandardKey.Forward]; onActivated: window.navigateForward() }
-    Shortcut { sequences: [StandardKey.Close]; onActivated: tabs.closeTab(tabs.activeIndex) }
+    Shortcut { sequences: [StandardKey.Close]; onActivated: tabs.closeTab(tabs.activeTabId) }
     Shortcut { sequences: ["Ctrl+Tab"]; onActivated: tabs.cycle(1) }
     Shortcut { sequences: ["Ctrl+Shift+Tab"]; onActivated: tabs.cycle(-1) }
+    Shortcut { sequences: ["Ctrl+Shift+N"]; onActivated: sidebar.newGroup() }
+    Shortcut { sequences: ["F2"]; onActivated: sidebar.renameActiveGroup() }
+    Shortcut { sequences: ["Ctrl+Shift+Up"]; onActivated: tabs.moveActiveTab(-1) }
+    Shortcut { sequences: ["Ctrl+Shift+Down"]; onActivated: tabs.moveActiveTab(1) }
     Shortcut { sequences: [StandardKey.ZoomIn, "Ctrl+="]; onActivated: viewer.zoomIn() }
     Shortcut { sequences: [StandardKey.ZoomOut]; onActivated: viewer.zoomOut() }
     Shortcut { sequences: ["Ctrl+0"]; onActivated: viewer.fitWidth() }
@@ -134,49 +140,50 @@ ApplicationWindow {
         }
     }
 
-    RowLayout {
-        anchors.fill: parent
-        spacing: 0
+    // Deleting a group closes its tabs, so ask unless it is empty.
+    property int groupToDelete: -1
 
-        // Flat tab list for now; M4 turns this into the group tree.
-        ListView {
-            id: tabList
-            Layout.preferredWidth: 220
-            Layout.fillHeight: true
-            clip: true
-            model: tabs.model
-            currentIndex: tabs.activeIndex
-            boundsBehavior: Flickable.StopAtBounds
-
-            delegate: ItemDelegate {
-                id: tabDelegate
-                required property int index
-                required property string title
-                width: ListView.view.width
-                highlighted: ListView.isCurrentItem
-                onClicked: tabs.activate(index)
-
-                contentItem: RowLayout {
-                    Label {
-                        Layout.fillWidth: true
-                        text: tabDelegate.title
-                        elide: Text.ElideRight
-                    }
-                    ToolButton {
-                        text: "×"
-                        visible: tabDelegate.hovered || tabDelegate.highlighted
-                        onClicked: tabs.closeTab(tabDelegate.index)
-                    }
-                }
-            }
+    function deleteGroup(groupId) {
+        if (tabs.model.groupIndex(groupId) < 0)
+            return
+        if (tabs.model.groupTabCount(groupId) === 0) {
+            tabs.deleteGroup(groupId)
+            return
         }
+        groupToDelete = groupId
+        deleteGroupDialog.open()
+    }
 
-        ToolSeparator { Layout.fillHeight: true }
+    Dialog {
+        id: deleteGroupDialog
+        title: qsTr("Delete group?")
+        modal: true
+        anchors.centerIn: parent
+        standardButtons: Dialog.Yes | Dialog.Cancel
+        onAccepted: tabs.deleteGroup(window.groupToDelete)
+        Label {
+            text: qsTr("This closes the tabs in the group. Positions in the documents are remembered.")
+            wrapMode: Text.Wrap
+            width: 320
+        }
+    }
+
+    SplitView {
+        anchors.fill: parent
+
+        Sidebar {
+            id: sidebar
+            SplitView.preferredWidth: 240
+            SplitView.minimumWidth: 140
+            SplitView.fillHeight: true
+            controller: tabs
+            onDeleteGroupRequested: groupId => window.deleteGroup(groupId)
+        }
 
         Viewer {
             id: viewer
-            Layout.fillWidth: true
-            Layout.fillHeight: true
+            SplitView.fillWidth: true
+            SplitView.fillHeight: true
             focus: true
 
             onLinkFollowed: from => tabs.recordJump(from.page, from.offsetY, from.zoom)

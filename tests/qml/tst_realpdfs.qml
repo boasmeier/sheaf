@@ -79,8 +79,8 @@ Item {
         function test_following_a_real_link_and_going_back() {
             if (realPdfs.length < 1)
                 skip("no real PDFs given")
-            while (tabs.model.rowCount() > 0)
-                tabs.closeTab(0)
+            for (const group of tabs.groups())
+                tabs.deleteGroup(group.id)
             tryVerify(() => !win.viewer.hasDocument, 5000)
             waitForSwitch(() => tabs.openFile(realPdfs[0]))
 
@@ -121,7 +121,7 @@ Item {
             const remembered = [0, 0]
             for (let i = 0; i < 12; ++i) {
                 const tab = i % 2
-                waitForSwitch(() => tabs.activate(tab))
+                waitForSwitch(() => tabs.activate(tabs.tabIds()[tab]))
                 // The first visit shows whatever an earlier test left stored (or page 0); later visits our own page.
                 const stored = tabs.activePosition
                 if (i < 2)
@@ -132,8 +132,8 @@ Item {
                 compare(immediate, freshFingerprint(), "wrong page image on tab " + tab + " (switch " + i + ")")
 
                 const page = 20 + (i * 47) % Math.max(1, win.viewer.pageCount - 40)
-                win.viewer.goToPage(page)
-                tryCompare(win.viewer, "currentPage", page, 5000)
+                win.viewer.jumpTo({ page: page, offsetY: 0, zoom: win.viewer.zoom })
+                tryVerify(() => win.viewer.topPosition().page === page, 5000)
                 wait(500)
                 remembered[tab] = win.viewer.topPosition().page
                 compare(remembered[tab], page)

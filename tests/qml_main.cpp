@@ -29,6 +29,14 @@ public:
   Q_INVOKABLE void keyClick(QWindow* window, int key, int modifiers) const {
     QTest::keyClick(window, static_cast<Qt::Key>(key), static_cast<Qt::KeyboardModifiers>(modifiers));
   }
+
+  // Types `text` into the window's focused item.
+  // NOLINTNEXTLINE(readability-identifier-naming): QML-facing API
+  Q_INVOKABLE void keyClicks(QWindow* window, const QString& text) const {
+    for (const QChar character : text) {
+      QTest::keyClick(window, character.toLatin1());
+    }
+  }
 };
 
 class Setup;
@@ -57,6 +65,15 @@ public slots:
     // QUICK_TEST_MAIN destroys the application object before this one, and the database needs it to close.
     g_setup = this;
     qAddPostRoutine(ReleaseSetup);
+    // Small distinct documents for tests that need many tabs.
+    QVariantList many;
+    for (int i = 1; i <= 8; ++i) {
+      const QString path = dir_.filePath(QString("doc%1.pdf").arg(i));
+      if (!sheaf::testing::WritePdfFixture(path, QString("DOC%1").arg(i), 3, false)) {
+        qFatal("Cannot write fixture PDFs");
+      }
+      many.append(QUrl::fromLocalFile(path));
+    }
     positions_ = std::make_unique<sheaf::PositionStore>(database_);
     tabs_ = std::make_unique<sheaf::TabController>(*positions_);
 
@@ -72,6 +89,7 @@ public slots:
     engine->rootContext()->setContextProperty("fixtures", QVariantMap{{"alpha", QUrl::fromLocalFile(alpha)},
                                                                       {"beta", QUrl::fromLocalFile(beta)},
                                                                       {"linked", QUrl::fromLocalFile(linked)},
+                                                                      {"many", many},
                                                                       {"externalUrl", sheaf::testing::kExternalLinkUrl},
                                                                       {"linkJump", sheaf::testing::kLinkJump}});
   }

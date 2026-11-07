@@ -32,8 +32,8 @@ add_library(sheaf_core STATIC
   src/util/FileIdentity.h
   src/app/NavigationHistory.cpp
   src/app/NavigationHistory.h
-  src/app/TabListModel.cpp
-  src/app/TabListModel.h
+  src/app/SessionModel.cpp
+  src/app/SessionModel.h
   src/app/TabController.cpp
   src/app/TabController.h
 )
@@ -45,7 +45,7 @@ qt_add_executable(sheaf src/main.cpp)
 qt_add_qml_module(sheaf
   URI Sheaf
   VERSION 1.0
-  QML_FILES qml/Main.qml qml/Viewer.qml qml/PdfPane.qml qml/SheafPdfView.qml
+  QML_FILES qml/Main.qml qml/Viewer.qml qml/PdfPane.qml qml/SheafPdfView.qml qml/Sidebar.qml
 )
 target_link_libraries(sheaf PRIVATE sheaf_core Qt6::Quick Qt6::Pdf Qt6::PdfQuick)
 sheaf_set_warnings(sheaf)

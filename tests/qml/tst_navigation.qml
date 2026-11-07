@@ -41,8 +41,8 @@ Item {
         }
 
         function init() {
-            while (tabs.model.rowCount() > 0)
-                tabs.closeTab(0)
+            for (const group of tabs.groups())
+                tabs.deleteGroup(group.id)
             tryVerify(() => !win.viewer.hasDocument, 3000)
         }
 
@@ -170,7 +170,7 @@ Item {
             wait(200)
 
             spy = createTemporaryObject(spyComponent, win, { target: win.viewer })
-            tabs.activate(0)
+            tabs.activate(tabs.tabIds()[0])
             spy.wait(10000)
             spy.destroy()
             verify(tabs.canGoBack, "history lost when switching tabs")
@@ -192,7 +192,7 @@ Item {
             clickInternalLink()
             tryCompare(win.viewer, "currentPage", 10 + fixtures.linkJump, 3000)
             verify(tabs.canGoBack)
-            tabs.closeTab(0)
+            tabs.closeTab(tabs.tabIds()[0])
             tryVerify(() => !win.viewer.hasDocument, 3000)
             verify(!tabs.canGoBack)
         }

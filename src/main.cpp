@@ -30,14 +30,18 @@ int main(int argc, char* argv[]) {
   sheaf::TabController tabs(positions);
   QObject::connect(&app, &QCoreApplication::aboutToQuit, &tabs, [&tabs] { tabs.Flush(); });
 
-  const int first_cli_tab = tabs.model()->Count();
+  // Open every file given; the first one is the one shown.
+  int first_cli_tab = -1;
   for (const QString& argument : parser.positionalArguments()) {
     const QUrl url = QUrl::fromUserInput(argument, QDir::currentPath(), QUrl::AssumeLocalFile);
     if (!tabs.openFile(url)) {
       qWarning() << "Cannot open" << argument;
     }
+    else if (first_cli_tab < 0) {
+      first_cli_tab = tabs.activeTabId();
+    }
   }
-  if (tabs.model()->Count() > first_cli_tab) {
+  if (first_cli_tab >= 0) {
     tabs.activate(first_cli_tab);
   }
 
